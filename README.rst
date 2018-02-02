@@ -12,11 +12,84 @@ hostname/pid-12345/checkouts
 
 host  /  plugin   / plugininstance  type / typeinstance
 
-hostname/sqlalchemy-nova/checkouts-12345    derive value=value
-hostname/sqlalchemy-nova/transactions-12345  derive value=value
-hostname/sqlalchemy-nova/checkedout-12345   gauge
-hostname/sqlalchemy-nova/pooled-12345   gauge
-hostname/sqlalchemy-nova/connected-12345  gauge
+# use real types, requires custom types.db w/ awkward configuration
+hostname/sqlalchemy-nova/checkouts-12345
+hostname/sqlalchemy-nova/transactions-12345
+hostname/sqlalchemy-nova/checkedout-12345
+hostname/sqlalchemy-nova/pooled-12345
+hostname/sqlalchemy-nova/connected-12345
+
+# another one w/ a "wide" value
+
+# key:
+# host / plugin-plugininstance / type-typeinstance
+
+# we will use this layout, "configured-name" is part of the
+# sqlalchemy url conf, e.g  mysql://nova:pw@hostname/nova?plugin=sqlalchemy-collectd&collectd_name=nova
+
+# host / sqlalchemy-<configured-name> / <sqlalchemy custom type>-<process id>
+
+
+# for the values, when we see a "gauge" thats a number we report directly,
+# when we see a "derived", collectd can turn that into a rate over time, e.g.
+# checkouts / sec  transactions / sec
+
+# so say nova has process ids 123 and 4567, neutron has procss ids 9856 and 786,
+
+hostname/sqlalchemy-nova/sqlalchemy_pool-123   numpools=gauge checkedout=gauge overflow=gauge pooled=gauge total=gauge
+hostname/sqlalchemy-nova/sqlalchemy_transactions-123   count=gauge
+hostname/sqlalchemy-nova/sqlalchemy_checkouts-123   count=derived
+hostname/sqlalchemy-nova/sqlalchemy_commits-123   count=derived
+hostname/sqlalchemy-nova/sqlalchemy_rollbacks-123   count=derived
+hostname/sqlalchemy-nova/sqlalchemy_invalidated-123   count=derived
+
+
+hostname/sqlalchemy-neutron/sqlalchemy_pool-9865   numpools=gauge checkedout=gauge overflow=gauge pooled=gauge total=gauge
+hostname/sqlalchemy-neutron/sqlalchemy_checkouts-9865   count=derived
+hostname/sqlalchemy-neutron/sqlalchemy_transactions-9865   count=derived
+hostname/sqlalchemy-neutron/sqlalchemy_pool-786   numpools=gauge checkedout=gauge overflow=gauge pooled=gauge total=gauge
+hostname/sqlalchemy-neutron/sqlalchemy_checkouts-786   count=derived
+hostname/sqlalchemy-neutron/sqlalchemy_transactions-786   count=derived
+
+
+# then we're going to use the <Plugin "aggregation"> to flatten out the
+# process id part of it so that we get the stats per program / database URL
+# overall, then a second <Plugin "aggregation"> will further take that
+# and get us the stats per hostname, that's what will be sent to graphite
+# out of the box.
+
+
+
+hostname/sqlalchemy-nova/sqlalchemy_checkouts-12345   count=derived
+hostname/sqlalchemy-nova/sqlalchemy_transactions-12345   count=derived
+
+
+
+# alternate - but no way to aggregate b.c. can't aggregate on regexp
+hostname/sqlalchemy-nova-12345/derive-checkouts
+hostname/sqlalchemy-nova-12345/derive-transactions
+hostname/sqlalchemy-nova-12345/gauge-checkedout
+hostname/sqlalchemy-nova-12345/gauge-pooled
+hostname/sqlalchemy-nova-12345/gauge-connected
+
+# alternate #2
+hostname/sqlalchemy-12345/derive-nova-checkouts    value
+hostname/sqlalchemy-12345/derive-nova-transactions value
+hostname/sqlalchemy-12345/gauge-nova-checkedout  value
+hostname/sqlalchemy-12345/gauge-nova-pooled      value
+hostname/sqlalchemy-12345/gauge-nova-connected   value
+
+# with #2, aggregate on host, type instance, gives us:
+hostname/sqlalchemy/derive-nova-checkouts    value
+hostname/sqlalchemy/derive-nova-transactions value
+hostname/sqlalchemy/gauge-nova-checkedout  value
+hostname/sqlalchemy/gauge-nova-pooled      value
+hostname/sqlalchemy/gauge-nova-connected   value
+
+# but! still can't aggregate across nova/neutron/etc
+
+
+
 
 
 <Plugin "aggregation">
