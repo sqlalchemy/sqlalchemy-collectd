@@ -1,2 +1,9 @@
-sqlalchemy_pool numpools:GAUGE:0:U, checkedout:GAUGE:0:U, checkedin:GAUGE:0:U, detached:GAUGE:0:U, total:GAUGE:0:U
+sqlalchemy_pool numpools:GAUGE:0:U, checkedout:GAUGE:0:U, checkedin:GAUGE:0:U, detached:GAUGE:0:U, invalidated:GAUGE:0:U, total:GAUGE:0:U
+sqlalchemy_checkouts count:DERIVE:0:U
+sqlalchemy_commits count:DERIVE:0:U
+sqlalchemy_rollbacks count:DERIVE:0:U
+sqlalchemy_invalidated count:DERIVE:0:U
+sqlalchemy_transactions count:GAUGE:0:U
+
+
 
