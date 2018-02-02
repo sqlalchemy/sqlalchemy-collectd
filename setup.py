@@ -35,8 +35,10 @@ setup(
     author_email='mike@zzzcomputing.com',
     url='http://github.org/zzzeek/sqlalchemy-collectd',
     license='MIT',
-    packages=["sqlalchemy_collectd"],
+    packages=find_packages(".", exclude=["*.tests"]),
     include_package_data=True,
+    tests_require=['pytest', 'mock'],
+    setup_requires=['pytest-runner'],
     zip_safe=False,
     install_requires=requires,
 )

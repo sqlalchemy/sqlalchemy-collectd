@@ -111,13 +111,14 @@ class MessageSender(object):
         )
 
     def _pack_string(self, typecode, value):
-        return struct.pack("!HH", typecode, 5 + len(value)) + value + b"\0"
+        return struct.pack(
+            "!HH", typecode, 5 + len(value)) + value.encode('ascii') + b"\0"
 
     def send(self, connection, timestamp, *values):
         """Send a message on a connection."""
 
         header = self._host_message_part + \
-            struct.pack("!HHq", TYPE_TIME, 12, timestamp) + \
+            struct.pack("!HHq", TYPE_TIME, 12, int(timestamp)) + \
             self._remainder_message_parts
 
         payload = self.type.encode_values(*values)
