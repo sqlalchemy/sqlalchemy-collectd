@@ -21,11 +21,12 @@ class Sender(object):
         self.hostname = hostname
         self.stats_name = stats_name
 
-    def send(self, connection, collection_target, timestamp, pid):
+    def send(self, connection, collection_target, timestamp, interval, pid):
         for collectd_type, sender in senders:
             message_sender = collectd.MessageSender(
                 collectd_type, self.hostname, "sqlalchemy",
-                plugin_instance=self.stats_name, type_instance=str(pid)
+                plugin_instance=str(pid), type_instance=self.stats_name,
+                interval=interval
             )
             value = sender(collection_target)
             message_sender.send(connection, timestamp, value)

@@ -18,12 +18,12 @@ def _check_threads_started():
     if _WORKER_THREAD is None or _PID != ospid:
 
         _PID = ospid
-        _WORKER_THREAD = threading.Thread(target=_process)
+        _WORKER_THREAD = threading.Thread(target=_process, args=(5, ))
         _WORKER_THREAD.daemon = True
         _WORKER_THREAD.start()
 
 
-def _process():
+def _process(interval):
     pid = os.getpid()
     log.info("Starting process thread in pid %s", pid)
 
@@ -32,9 +32,9 @@ def _process():
         for (
                 collection_target, connection,
                 sender, last_called) in _collection_targets:
-            if now - last_called[0] > 5:  # TODO configurable send interval
+            if now - last_called[0] > interval:
                 last_called[0] = now
-                sender.send(connection, collection_target, now, pid)
+                sender.send(connection, collection_target, now, interval, pid)
 
         time.sleep(.2)
 
