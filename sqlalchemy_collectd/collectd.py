@@ -2,6 +2,7 @@ import struct
 import socket
 import logging
 import threading
+import os
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +62,12 @@ class Type(object):
                 ("midterm", VALUE_GAUGE),
                 ("longterm", VALUE_GAUGE)
             )
+
+        note: for all the great effort here in working up types,
+        collectd aggregation plugin doesn't support more than one dsvalue
+        at a time in a record so all this flexibility is all a waste of
+        time :(
+
         """
         self.name = name
         self._value_types = [value_type for dsname, value_type in db_template]
@@ -127,15 +134,39 @@ class MessageSender(object):
 
 
 class Connection(object):
+    connections = {}
+    create_mutex = threading.Lock()
+
     def __init__(self, host="localhost", port=25826):
         self.host = host
         self.port = port
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._mutex = threading.Lock()
+        self.socket = None
+        self.pid = None
+
+    def _check_connect(self):
+        if self.socket is None or self.pid != os.getpid():
+            self.pid = os.getpid()
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    @classmethod
+    def for_host_port(cls, host, port):
+        cls.create_mutex.acquire()
+        try:
+            key = (host, port)
+            if key not in cls.connections:
+                cls.connections[key] = connection = Connection(host, port)
+                return connection
+            else:
+                return cls.connections[key]
+
+        finally:
+            cls.create_mutex.release()
 
     def send(self, message):
         self._mutex.acquire()
         try:
+            self._check_connect()
             log.debug("sending: %r", message)
             self.socket.sendto(message, (self.host, self.port))
         except IOError:

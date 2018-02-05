@@ -1,4 +1,13 @@
+import os
+import socket
+import sys
+
 from sqlalchemy.engine import CreateEnginePlugin
+
+from . import collectd
+from . import sender
+from . import worker
+from . import collector
 
 
 class Plugin(CreateEnginePlugin):
@@ -18,5 +27,26 @@ class Plugin(CreateEnginePlugin):
         registering engine or connection pool events.
 
         """
+
+        # TODO: all this configurable
+        hostname = socket.gethostname()
+        progname = sys.argv[0]
+
+        collectd_hostname = "localhost"
+        collectd_port = 25826
+
+        sender_ = sender.Sender(hostname, progname)
+        collection_target = collector.CollectionTarget.collection_for_name(
+            progname)
+        collector.EngineCollector(collection_target, engine)
+
+        connection = collectd.Connection.for_host_port(
+            collectd_hostname, collectd_port)
+
+        worker.add_target(
+            connection,
+            collection_target,
+            sender_)
+
 
 
