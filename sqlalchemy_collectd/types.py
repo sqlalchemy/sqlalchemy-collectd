@@ -1,27 +1,27 @@
-from . import collectd
+from . import protocol
 
-pool = collectd.Type(
+pool = protocol.Type(
 	"sqlalchemy_pool",
-	("numpools", collectd.VALUE_GAUGE),
-	("checkedout", collectd.VALUE_GAUGE),
-	("checkedin", collectd.VALUE_GAUGE),
-	("detached", collectd.VALUE_GAUGE),
-	("invalidated", collectd.VALUE_GAUGE),
-	("total", collectd.VALUE_GAUGE),
+	("numpools", protocol.VALUE_GAUGE),
+	("checkedout", protocol.VALUE_GAUGE),
+	("checkedin", protocol.VALUE_GAUGE),
+	("detached", protocol.VALUE_GAUGE),
+	("invalidated", protocol.VALUE_GAUGE),
+	("total", protocol.VALUE_GAUGE),
 )
 
-checkouts = collectd.Type(
-	"sqlalchemy_checkouts", ("count", collectd.VALUE_DERIVE))
+checkouts = protocol.Type(
+	"sqlalchemy_checkouts", ("count", protocol.VALUE_DERIVE))
 
-commits = collectd.Type(
-	"sqlalchemy_commits", ("count", collectd.VALUE_DERIVE))
+commits = protocol.Type(
+	"sqlalchemy_commits", ("count", protocol.VALUE_DERIVE))
 
-rollbacks = collectd.Type(
-	"sqlalchemy_rollbacks", ("count", collectd.VALUE_DERIVE))
+rollbacks = protocol.Type(
+	"sqlalchemy_rollbacks", ("count", protocol.VALUE_DERIVE))
 
-invalidated = collectd.Type(
-	"sqlalchemy_invalidated", ("count", collectd.VALUE_DERIVE))
+invalidated = protocol.Type(
+	"sqlalchemy_invalidated", ("count", protocol.VALUE_DERIVE))
 
-transactions = collectd.Type(
-	"sqlalchemy_transactions", ("count", collectd.VALUE_DERIVE))
+transactions = protocol.Type(
+	"sqlalchemy_transactions", ("count", protocol.VALUE_DERIVE))
 

@@ -1,13 +1,13 @@
-from . import collectd
-from . import types
+from .. import protocol
+from .. import types
 
 
 senders = []
 
 
-def sends(collectd_type):
+def sends(protocol_type):
     def decorate(fn):
-        senders.append((collectd_type, fn))
+        senders.append((protocol_type, fn))
         return fn
 
     return decorate
@@ -19,9 +19,9 @@ class Sender(object):
         self.stats_name = stats_name
 
     def send(self, connection, collection_target, timestamp, interval, pid):
-        for collectd_type, sender in senders:
-            message_sender = collectd.MessageSender(
-                collectd_type, self.hostname, "sqlalchemy",
+        for protocol_type, sender in senders:
+            message_sender = protocol.MessageSender(
+                protocol_type, self.hostname, "sqlalchemy",
                 plugin_instance=self.stats_name, type_instance=str(pid),
                 interval=interval
             )

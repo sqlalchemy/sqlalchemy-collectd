@@ -1,10 +1,9 @@
-import os
 import socket
 import sys
 
 from sqlalchemy.engine import CreateEnginePlugin
 
-from . import collectd
+from .. import protocol
 from . import sender
 from . import worker
 from . import collector
@@ -40,7 +39,7 @@ class Plugin(CreateEnginePlugin):
             progname)
         collector.EngineCollector(collection_target, engine)
 
-        connection = collectd.ClientConnection.for_host_port(
+        connection = protocol.ClientConnection.for_host_port(
             collectd_hostname, collectd_port)
 
         worker.add_target(

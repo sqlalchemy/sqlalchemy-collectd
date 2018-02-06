@@ -1,3 +1,7 @@
+"""Using the collectd protocol because we originally were going to
+connect straight to the network plugin.
+
+"""
 import struct
 import socket
 import logging
@@ -24,18 +28,16 @@ TYPE_TYPE_INSTANCE = 0x0005
 TYPE_VALUES = 0x0006
 TYPE_INTERVAL = 0x0007
 
-header = struct.Struct("!2H")
-number = struct.Struct("!Q")
+header = struct.Struct("!HH")
 short = struct.Struct("!H")
-double = struct.Struct("<d")
 char = struct.Struct("B")
 long_ = struct.Struct("!q")
 
 _value_formats = {
-    VALUE_COUNTER: number,
-    VALUE_GAUGE: double,
+    VALUE_COUNTER: struct.Struct("!Q"),
+    VALUE_GAUGE: struct.Struct("<d"),
     VALUE_DERIVE: long_,
-    VALUE_ABSOLUTE: number
+    VALUE_ABSOLUTE: struct.Struct("!Q")
 }
 
 
@@ -56,7 +58,10 @@ class Type(object):
 
     """
 
-    __slots__ = 'name', '_value_types', '_value_formats', '_message_template'
+    __slots__ = (
+        'name', '_value_types', '_value_formats',
+        '_message_template', '_field_names'
+    )
 
     def __init__(self, name, *db_template):
         """Contruct a new Type.
@@ -77,6 +82,7 @@ class Type(object):
 
         """
         self.name = name
+        self._field_names = [dsname for dsname, value_type in db_template]
         self._value_types = [value_type for dsname, value_type in db_template]
         self._value_formats = [
             _value_formats[value_type] for value_type in self._value_types]
@@ -87,7 +93,7 @@ class Type(object):
         for value_type in self._value_types:
             self._message_template += char.pack(value_type)
 
-    def encode_values(self, *values):
+    def _encode_values(self, *values):
         """Encode a series of values according to the type template."""
 
         msg = self._message_template
@@ -137,9 +143,78 @@ class MessageSender(object):
             long_.pack(int(timestamp)) + \
             self._remainder_message_parts
 
-        payload = self.type.encode_values(*values)
+        payload = self.type._encode_values(*values)
 
         connection.send(header_ + payload)
+
+
+class MessageReceiver(object):
+    def __init__(self, *types):
+        self._receivers = {
+            TYPE_HOST: self._unpack_string,
+            TYPE_TIME: self._unpack_long,
+            TYPE_PLUGIN: self._unpack_string,
+            TYPE_PLUGIN_INSTANCE: self._unpack_string,
+            TYPE_TYPE: self._unpack_string,
+            TYPE_TYPE_INSTANCE: self._unpack_string,
+            TYPE_VALUES: self._unpack_values,
+            TYPE_INTERVAL: self._unpack_long,
+        }
+        self._types = {
+            type_.name: type_ for type_ in types
+        }
+
+    def receive(self, buf):
+        result = self._unpack_packet(buf)
+        type_name = result[TYPE_TYPE]
+        try:
+            type_ = self._types[type_name]
+        except KeyError:
+            log.warn("Type %s not known, skipping", type_name)
+        else:
+            result["type"] = type_
+            result["values"] = {
+                name: value
+                for name, value in zip(type_._field_names, result[TYPE_VALUES])
+            }
+            return result
+
+    def _unpack_packet(self, buf):
+        pos = 0
+        length = len(buf)
+        result = {}
+        while pos < length:
+            type_, len_ = header.unpack_from(buf, pos)
+
+            try:
+                fn = self._receivers[type_]
+            except KeyError:
+                log.warn("Message %s not known, skipping", type_)
+            else:
+                value = fn(type_, len_, buf[pos:])
+
+                result[type_] = value
+
+            pos += len_
+        return result
+
+    def _unpack_long(self, type_, length, buf):
+        return long_.unpack_from(buf, header.size)[0]
+
+    def _unpack_string(self, type_, length, buf):
+        return buf[header.size:length - 1]
+
+    def _unpack_values(self, type_, length, buf):
+        num = short.unpack_from(buf, header.size)[0]
+        types_start = header.size + short.size
+        values_pos = types_start + num * char.size
+        result = []
+        for pos in range(0, num * char.size, char.size):
+            value_type = char.unpack_from(buf, types_start + pos)[0]
+            struct_ = _value_formats[value_type]
+            result.append(struct_.unpack_from(buf, values_pos)[0])
+            values_pos += struct_.size
+        return result
 
 
 class ClientConnection(object):
@@ -183,3 +258,7 @@ class ClientConnection(object):
             log.error("Error in socket.sendto", exc_info=True)
         finally:
             self._mutex.release()
+
+
+class ServerConnection(object):
+    pass
