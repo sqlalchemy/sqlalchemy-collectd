@@ -24,11 +24,18 @@ TYPE_TYPE_INSTANCE = 0x0005
 TYPE_VALUES = 0x0006
 TYPE_INTERVAL = 0x0007
 
+header = struct.Struct("!2H")
+number = struct.Struct("!Q")
+short = struct.Struct("!H")
+double = struct.Struct("<d")
+char = struct.Struct("B")
+long_ = struct.Struct("!q")
+
 _value_formats = {
-    VALUE_COUNTER: "!Q",
-    VALUE_GAUGE: "<d",
-    VALUE_DERIVE: "!q",
-    VALUE_ABSOLUTE: "!Q"
+    VALUE_COUNTER: number,
+    VALUE_GAUGE: double,
+    VALUE_DERIVE: long_,
+    VALUE_ABSOLUTE: number
 }
 
 
@@ -73,18 +80,19 @@ class Type(object):
         self._value_types = [value_type for dsname, value_type in db_template]
         self._value_formats = [
             _value_formats[value_type] for value_type in self._value_types]
-        self._message_template = struct.pack(
-            "!HHH", TYPE_VALUES, 6 + (9 * len(db_template)),
-            len(db_template))
+
+        self._message_template = header.pack(
+            TYPE_VALUES, 6 + (9 * len(db_template))
+        ) + short.pack(len(db_template))
         for value_type in self._value_types:
-            self._message_template += struct.pack("B", value_type)
+            self._message_template += char.pack(value_type)
 
     def encode_values(self, *values):
         """Encode a series of values according to the type template."""
 
         msg = self._message_template
         for format_, dsvalue in zip(self._value_formats, values):
-            msg += struct.pack(format_, dsvalue)
+            msg += format_.pack(dsvalue)
 
         return msg
 
@@ -118,22 +126,23 @@ class MessageSender(object):
         )
 
     def _pack_string(self, typecode, value):
-        return struct.pack(
-            "!HH", typecode, 5 + len(value)) + value.encode('ascii') + b"\0"
+        return header.pack(
+            typecode, 5 + len(value)) + value.encode('ascii') + b"\0"
 
     def send(self, connection, timestamp, *values):
         """Send a message on a connection."""
 
-        header = self._host_message_part + \
-            struct.pack("!HHq", TYPE_TIME, 12, int(timestamp)) + \
+        header_ = self._host_message_part + \
+            header.pack(TYPE_TIME, 12) + \
+            long_.pack(int(timestamp)) + \
             self._remainder_message_parts
 
         payload = self.type.encode_values(*values)
 
-        connection.send(header + payload)
+        connection.send(header_ + payload)
 
 
-class Connection(object):
+class ClientConnection(object):
     connections = {}
     create_mutex = threading.Lock()
 
@@ -155,7 +164,8 @@ class Connection(object):
         try:
             key = (host, port)
             if key not in cls.connections:
-                cls.connections[key] = connection = Connection(host, port)
+                cls.connections[key] = connection = \
+                    ClientConnection(host, port)
                 return connection
             else:
                 return cls.connections[key]

@@ -40,7 +40,7 @@ class Plugin(CreateEnginePlugin):
             progname)
         collector.EngineCollector(collection_target, engine)
 
-        connection = collectd.Connection.for_host_port(
+        connection = collectd.ClientConnection.for_host_port(
             collectd_hostname, collectd_port)
 
         worker.add_target(
