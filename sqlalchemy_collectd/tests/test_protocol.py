@@ -1,7 +1,7 @@
 import mock
 import unittest
 
-from sqlalchemy_collectd import protocol
+from .. import protocol
 
 
 class CollectDProtocolTest(unittest.TestCase):
