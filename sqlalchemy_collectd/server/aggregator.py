@@ -1,17 +1,47 @@
-import collections
+import itertools
+
+
+def avg(values):
+    return sum(values) / len(values)
 
 
 class Aggregator(object):
-    def __init__(self):
-        # TOOD: configurable size
-        self.queue = collections.deque(maxlen=100000)
+    def __init__(self, interval=10):
+        self.interval = interval
+        self.pool_stats = TimeBucket(4, interval)
 
-    def put(self, message):
-        self.queue.appendleft(message)
+    def set_pool_stats(
+            self, hostname, progname, pid, timestamp, numpools,
+            checkedout, checkedin, detached, invalidated, total):
 
-    def outgoing(self):
-        while self.queue:
-            yield self.queue.pop()
+        records = self.pool_stats.get_data(timestamp)
+        records[(hostname, progname, pid)] = (
+            numpools, checkedout, checkedin, detached, invalidated, total
+        )
+
+    def get_pool_stats_by_progname(self, timestamp, agg_func):
+        return self._get_stats_by_progname(
+            self.pool_stats, timestamp, agg_func)
+
+    def get_pool_stats_by_hostname(self, timestamp, agg_func):
+        return self._get_stats_by_hostname(
+            self.pool_stats, timestamp, agg_func)
+
+    def _get_stats_by_progname(self, bucket, timestamp, agg_func):
+        records = bucket.get_data(timestamp)
+        for (hostname, progname), keys in itertools.groupby(
+            sorted(records), key=lambda rec: (rec[0], rec[1])
+        ):
+            recs = [records[key] for key in keys]
+            yield hostname, progname, [agg_func(coll) for coll in zip(*recs)]
+
+    def _get_stats_by_hostname(self, bucket, timestamp, agg_func):
+        records = bucket.get_data(timestamp)
+        for hostname, keys in itertools.groupby(
+            sorted(records), key=lambda rec: rec[0]
+        ):
+            recs = [records[key] for key in keys]
+            yield hostname, [agg_func(coll) for coll in zip(*recs)]
 
 
 class TimeBucket(object):
@@ -61,6 +91,7 @@ class TimeBucket(object):
         self.interval = interval
 
     def _get_bucket(self, timestamp):
+        timestamp = int(timestamp)
         slot = (timestamp // self.interval)
         bucket_num = slot % self.num_buckets
         bucket = self.buckets[bucket_num]
