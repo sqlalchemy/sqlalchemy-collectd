@@ -35,7 +35,7 @@ class Receiver(object):
         values = message[protocol.TYPE_VALUES]
         pid = message[protocol.TYPE_TYPE_INSTANCE]
         self.aggregator.set_stats(
-            type_name, host, progname, pid, timestamp, *values
+            type_name, host, progname, pid, timestamp, values
         )
 
     def summarize(self, timestamp):

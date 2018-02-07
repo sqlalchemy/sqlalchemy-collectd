@@ -11,14 +11,11 @@ class Aggregator(object):
         self.buckets = {name: TimeBucket(4, interval) for name in bucket_names}
 
     def set_stats(
-            self, bucket_name, hostname, progname, pid, timestamp, numpools,
-            checkedout, checkedin, detached, invalidated, total):
+            self, bucket_name, hostname, progname, pid, timestamp, values):
 
         bucket = self.buckets[bucket_name]
         records = bucket.get_data(timestamp)
-        records[(hostname, progname, pid)] = (
-            numpools, checkedout, checkedin, detached, invalidated, total
-        )
+        records[(hostname, progname, pid)] = values
 
     def get_stats_by_progname(self, bucket_name, timestamp, agg_func):
         bucket = self.buckets[bucket_name]
