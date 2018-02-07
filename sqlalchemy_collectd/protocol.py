@@ -171,6 +171,7 @@ class MessageReceiver(object):
             type_ = self._types[type_name]
         except KeyError:
             log.warn("Type %s not known, skipping", type_name)
+            return None
         else:
             result["type"] = type_
             result["values"] = {
@@ -202,7 +203,7 @@ class MessageReceiver(object):
         return long_.unpack_from(buf, header.size)[0]
 
     def _unpack_string(self, type_, length, buf):
-        return buf[header.size:length - 1]
+        return buf[header.size:length - 1].decode('ascii')
 
     def _unpack_values(self, type_, length, buf):
         num = short.unpack_from(buf, header.size)[0]
@@ -261,4 +262,11 @@ class ClientConnection(object):
 
 
 class ServerConnection(object):
-    pass
+    def __init__(self, host, port):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind((host, port))
+
+    def receive(self):
+        data, addr = self.sock.recvfrom(1024)
+        return data, addr
+

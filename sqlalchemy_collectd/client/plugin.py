@@ -26,26 +26,27 @@ class Plugin(CreateEnginePlugin):
         registering engine or connection pool events.
 
         """
-
-        # TODO: all this configurable
-        hostname = socket.gethostname()
-        progname = sys.argv[0]
-
-        collectd_hostname = "localhost"
-        collectd_port = 25826
-
-        sender_ = sender.Sender(hostname, progname)
-        collection_target = collector.CollectionTarget.collection_for_name(
-            progname)
-        collector.EngineCollector(collection_target, engine)
-
-        connection = protocol.ClientConnection.for_host_port(
-            collectd_hostname, collectd_port)
-
-        worker.add_target(
-            connection,
-            collection_target,
-            sender_)
+        start_plugin(engine)
 
 
+def start_plugin(engine):
+    # TODO: all this configurable
+    hostname = socket.gethostname()
+    progname = sys.argv[0]
+
+    collectd_hostname = "localhost"
+    collectd_port = 25827
+
+    sender_ = sender.Sender(hostname, progname)
+    collection_target = collector.CollectionTarget.collection_for_name(
+        progname)
+    collector.EngineCollector(collection_target, engine)
+
+    connection = protocol.ClientConnection.for_host_port(
+        collectd_hostname, collectd_port)
+
+    worker.add_target(
+        connection,
+        collection_target,
+        sender_)
 
