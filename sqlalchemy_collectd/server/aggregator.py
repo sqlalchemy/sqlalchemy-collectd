@@ -6,28 +6,22 @@ def avg(values):
 
 
 class Aggregator(object):
-    def __init__(self, interval=10):
+    def __init__(self, bucket_names, interval=10):
         self.interval = interval
-        self.pool_stats = TimeBucket(4, interval)
+        self.buckets = {name: TimeBucket(4, interval) for name in bucket_names}
 
-    def set_pool_stats(
-            self, hostname, progname, pid, timestamp, numpools,
+    def set_stats(
+            self, bucket_name, hostname, progname, pid, timestamp, numpools,
             checkedout, checkedin, detached, invalidated, total):
 
-        records = self.pool_stats.get_data(timestamp)
+        bucket = self.buckets[bucket_name]
+        records = bucket.get_data(timestamp)
         records[(hostname, progname, pid)] = (
             numpools, checkedout, checkedin, detached, invalidated, total
         )
 
-    def get_pool_stats_by_progname(self, timestamp, agg_func):
-        return self._get_stats_by_progname(
-            self.pool_stats, timestamp, agg_func)
-
-    def get_pool_stats_by_hostname(self, timestamp, agg_func):
-        return self._get_stats_by_hostname(
-            self.pool_stats, timestamp, agg_func)
-
-    def _get_stats_by_progname(self, bucket, timestamp, agg_func):
+    def get_stats_by_progname(self, bucket_name, timestamp, agg_func):
+        bucket = self.buckets[bucket_name]
         records = bucket.get_data(timestamp)
         for (hostname, progname), keys in itertools.groupby(
             sorted(records), key=lambda rec: (rec[0], rec[1])
@@ -35,7 +29,8 @@ class Aggregator(object):
             recs = [records[key] for key in keys]
             yield hostname, progname, [agg_func(coll) for coll in zip(*recs)]
 
-    def _get_stats_by_hostname(self, bucket, timestamp, agg_func):
+    def get_stats_by_hostname(self, bucket_name, timestamp, agg_func):
+        bucket = self.buckets[bucket_name]
         records = bucket.get_data(timestamp)
         for hostname, keys in itertools.groupby(
             sorted(records), key=lambda rec: rec[0]
