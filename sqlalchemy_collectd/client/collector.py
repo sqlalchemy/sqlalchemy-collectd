@@ -31,6 +31,11 @@ class CollectionTarget(object):
         # doesn't include DBAPI implicit transactions
         self.transactions = set()
 
+        self.total_checkouts = 0
+        self.total_invalidated = 0
+        self.total_connects = 0
+        self.total_disconnects = 0
+
     @classmethod
     def collection_for_name(cls, name):
         cls.create_mutex.acquire()
@@ -107,11 +112,13 @@ class EngineCollector(object):
     def _connect_evt(self, dbapi_conn, connection_rec):
         worker._check_threads_started()
         id_ = self.conn_ident(dbapi_conn)
+        self.collection_target.total_connects += 1
         self.connections.add(id_)
         self.checkedin.add(id_)
 
     def _checkout_evt(self, dbapi_conn, connection_rec, connection_proxy):
         id_ = self.conn_ident(dbapi_conn)
+        self.collection_target.total_checkouts += 1
         self.checkedin.remove(id_)
 
     def _checkin_evt(self, dbapi_conn, connection_rec):
@@ -120,6 +127,7 @@ class EngineCollector(object):
 
     def _invalidate_evt(self, dbapi_conn, connection_rec):
         id_ = self.conn_ident(dbapi_conn)
+        self.collection_target.total_invalidated += 1
         self.invalidated.add(id_)
 
     def _reset_evt(self, dbapi_conn, connection_rec):
@@ -135,6 +143,7 @@ class EngineCollector(object):
 
         try:
             self.connections.remove(id_)
+            self.collection_target.total_disconnects += 1
         except KeyError:
             self._warn_missing_connection(dbapi_conn)
 
@@ -165,6 +174,7 @@ class EngineCollector(object):
 
         try:
             self.connections.remove(id_)
+            self.collection_target.total_disconnects += 1
         except KeyError:
             self._warn_missing_connection(dbapi_conn)
 

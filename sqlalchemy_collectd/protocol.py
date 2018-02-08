@@ -93,6 +93,10 @@ class Type(object):
         for value_type in self._value_types:
             self._message_template += char.pack(value_type)
 
+    @property
+    def names(self):
+        return self._field_names
+
     def _encode_values(self, *values):
         """Encode a series of values according to the type template."""
 

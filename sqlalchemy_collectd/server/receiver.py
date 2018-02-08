@@ -1,28 +1,35 @@
 import collectd
 
 from .. import protocol
-from .. import types
 from . import aggregator
+from ..client import internal_types
 
 import logging
 log = logging.getLogger(__name__)
 
 
+summarizers = {}
+
+
+def summarizes(protocol_type):
+    def decorate(fn):
+        summarizers[protocol_type] = fn
+        return fn
+
+    return decorate
+
+
 class Receiver(object):
     def __init__(self, plugin="sqlalchemy"):
         self.plugin = plugin
-        self.types = types_ = [
-            types.pool,
-            types.checkouts,
-            types.commits,
-            types.rollbacks,
-            types.invalidated,
-            types.transactions
+        self.internal_types = [
+            internal_types.pool,
+            internal_types.totals
         ]
-        self.message_receiver = protocol.MessageReceiver(*types_)
+        self.message_receiver = protocol.MessageReceiver(*self.internal_types)
 
         self.aggregator = aggregator.Aggregator(
-            [type_.name for type_ in types_]
+            [type_.name for type_ in self.internal_types]
         )
 
     def receive(self, connection):
@@ -39,42 +46,72 @@ class Receiver(object):
         )
 
     def summarize(self, timestamp):
-        for type_ in self.types:
-            self._summarize_for_type(type_, timestamp)
+        for type_ in self.internal_types:
+            summarizer = summarizers.get(type_, None)
+            if summarizer:
+                summarizer(self, type_, timestamp)
 
-    def _summarize_for_type(self, type_, timestamp):
-        values = collectd.Values(
-            type=type_.name,
-            plugin=self.plugin,
-            time=timestamp,
-            interval=self.aggregator.interval
-        )
-        for hostname, progname, stats in \
-                self.aggregator.get_stats_by_progname(
-                    type_.name, timestamp, sum):
-            values.dispatch(
-                type_instance="sum", host=hostname, plugin_instance=progname,
-                values=stats
-            )
 
-        for hostname, stats in self.aggregator.get_stats_by_hostname(
+@summarizes(internal_types.pool)
+def _summarize_pool_stats(receiver, type_, timestamp):
+    values = collectd.Values(
+        type="count",
+        plugin=receiver.plugin,
+        time=timestamp,
+        interval=receiver.aggregator.interval
+    )
+    for hostname, progname, numrecs, stats in \
+            receiver.aggregator.get_stats_by_progname(
                 type_.name, timestamp, sum):
+        for name, value in zip(type_.names, stats):
             values.dispatch(
-                type_instance="sum", host=hostname, plugin_instance="all",
-                values=stats
+                host=hostname, plugin_instance=progname,
+                type_instance=name,
+                values=[value]
             )
 
-        for hostname, progname, stats in self.aggregator.get_stats_by_progname(
-                type_.name, timestamp, aggregator.avg):
+        values.dispatch(
+            host=hostname, plugin_instance=progname,
+            type_instance="numprocs", values=[numrecs])
+
+    for hostname, numrecs, stats in receiver.aggregator.get_stats_by_hostname(
+            type_.name, timestamp, sum):
+        for name, value in zip(type_.names, stats):
             values.dispatch(
-                type_instance="avg", host=hostname, plugin_instance=progname,
-                values=stats
+                host=hostname, plugin_instance="host",
+                type_instance=name,
+                values=[value]
+            )
+        values.dispatch(
+            host=hostname, plugin_instance="host",
+            type_instance="numprocs", values=[numrecs])
+
+
+@summarizes(internal_types.totals)
+def _summarize_totals(receiver, type_, timestamp):
+    values = collectd.Values(
+        type="derive",
+        plugin=receiver.plugin,
+        time=timestamp,
+        interval=receiver.aggregator.interval
+    )
+
+    for hostname, progname, numrecs, stats in \
+            receiver.aggregator.get_stats_by_progname(
+                type_.name, timestamp, sum):
+        for name, value in zip(type_.names, stats):
+            values.dispatch(
+                host=hostname, plugin_instance=progname,
+                type_instance=name,
+                values=[value]
             )
 
-        for hostname, stats in self.aggregator.get_stats_by_hostname(
-                type_.name, timestamp, aggregator.avg):
+    for hostname, numrecs, stats in receiver.aggregator.get_stats_by_hostname(
+            type_.name, timestamp, sum):
+        for name, value in zip(type_.names, stats):
             values.dispatch(
-                type_instance="avg", host=hostname, plugin_instance="all",
-                values=stats
+                host=hostname, plugin_instance="host",
+                type_instance=name,
+                values=[value]
             )
 

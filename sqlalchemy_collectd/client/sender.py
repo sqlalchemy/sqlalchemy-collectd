@@ -1,5 +1,5 @@
 from .. import protocol
-from .. import types
+from . import internal_types
 
 
 senders = []
@@ -29,7 +29,7 @@ class Sender(object):
             sender(message_sender, connection, collection_target, timestamp)
 
 
-@sends(types.pool)
+@sends(internal_types.pool)
 def _send_pool(message_sender, connection, collection_target, timestamp):
     message_sender.send(
         connection, timestamp,
@@ -39,4 +39,16 @@ def _send_pool(message_sender, connection, collection_target, timestamp):
         collection_target.num_detached,
         collection_target.num_invalidated,
         collection_target.num_connections
+    )
+
+
+@sends(internal_types.totals)
+def _send_connection_totals(
+        message_sender, connection, collection_target, timestamp):
+    message_sender.send(
+        connection, timestamp,
+        collection_target.total_checkouts,
+        collection_target.total_invalidated,
+        collection_target.total_connects,
+        collection_target.total_disconnects
     )
