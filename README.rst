@@ -4,10 +4,11 @@ sqlalchemy-collectd
 
 Send statistics on `SQLAlchemy <http://www.sqlalchemy.org>`_ connection and
 transaction metrics used by Python applications to the
-`collectd <https://collectd.org/>`_ service.   sqlalchemy-collectd works
-as a SQLAlchemy plugin invoked via the database URL, so can be used in
-**any** SQLAlchemy application (1.1 or greater) that accepts arbitrary
-connections URLs with no code changes whatsoever, as well as with **any**
+`collectd <https://collectd.org/>`_ service.
+
+sqlalchemy-collectd works as a SQLAlchemy plugin invoked via the database URL,
+so can be used in any SQLAlchemy application (1.1 or greater) that accepts
+arbitrary connections URLs with no code changes whatsoever, as well as with any
 database dialect.
 
 sqlalchemy-collectd is oriented towards providing a unified view of
