@@ -357,7 +357,7 @@ on the reporting tools being used.
   without calling ``.commit()`` or ``.rollback()``.
 
 Invalidated Connections
-^^^^^^^^^^^^^^^^^^^^^^^
+-----------------------
 
 The ``derive-invalidated`` stat records the rate of invalidations.
 
@@ -386,7 +386,7 @@ reconnected.  These connections which have been **implicitly** invalidated
 are **not** included in this count.
 
 Collectd Types
-^^^^^^^^^^^^^^^
+--------------
 
 These funny names ``count-`` and ``derive-`` are an artifact of how
 collectd provides **types**.  collectd has a fixed list of "types" which it
