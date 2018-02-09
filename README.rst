@@ -2,204 +2,397 @@
 sqlalchemy-collectd
 ===================
 
-Send statistics on SQLAlchemy connection and transaction use (and maybe other
-things in the future) to the `collectd <https://collectd.org/>`_ service.   collectd is a widely
-used system statistics collection tool which is supported by virtually all
-graphing and monitoring tools.
+Send statistics on `SQLAlchemy <http://www.sqlalchemy.org>`_ connection and
+transaction metrics used by Python applications to the
+`collectd <https://collectd.org/>`_ service.   sqlalchemy-collectd works
+as a SQLAlchemy plugin invoked via the database URL, so can be used in
+**any** SQLAlchemy application (1.1 or greater) that accepts arbitrary
+connections URLs with no code changes whatsoever, as well as with **any**
+database dialect.
+
+sqlalchemy-collectd is oriented towards providing a unified view of
+application-side database metrics in sprawling, many-host / many-process
+application clusters with multiple databases, proxy servers, dozens of
+applications or containers and hundreds of processes on dozens of hosts.
+
+What's collectd?
+================
+
+collectd is a statistics collection daemon that is easy to run.   It serves as
+a collector and re-broadcaster of runtime statistics for a wide variety of
+performance and other metrics.   Once a set of stats are in collectd, they can
+be broadcast out virtually anywhere, including to `RRD
+<https://oss.oetiker.ch/rrdtool/>_` databases and front-ends, to metrics
+reporting applications like `Graphite <https://graphiteapp.org/>`_ and `Grafana
+<https://grafana.com/>`_, and to `other collectd servers
+<https://collectd.org/wiki/index.php/Networking_introduction>`_.
+
+Architecture Nutshell
+=====================
+
+sqlalchemy-collectd gathers its statistics from **within** the Python
+application itself, and delivers live metrics to a collectd service over UDP.
+To achieve this, it's client portion is loaded within the process as a
+SQLAlchemy **engine plugin** that attaches listeners to a
+``sqlalchemy.engine.Engine`` object as well as the connection pool within it.
+A background thread running within each process periodically sends a snapshot
+of statistics out over UDP.
+
+On the collectd side, a Python plugin listens on the same UDP port and
+aggregates statistics received from any number of Python processes and hosts,
+and then delivers them to the collectd engine itself as a series of
+per-host and per-program statistics.
+
+A key goal of this architecture is to allow a Python program that uses
+multiple processes (e.g. via Python ``multiprocessing`` or just plain
+``fork``) to report **unified** information on each engine/connection pool
+within each subprocess, as well as to track multiple instances of the
+same application running from many hosts (and of course it can track
+any number of applications and hosts simultaneously).   Having a full
+client/server model allows the collectd service itself to be located not only
+on the same host as the application itself, but on any other host on the
+network.
+
+The network model itself makes use of collectd's own binary protocol; while
+not strictly necessary, this is because originally the plan was to use the
+collectd "network" plugin as the receiver, however after observing limitations
+in collectd's "aggregation" plugin this was replaced with a full Python plugin
+that does everything needed in a much more straightforward way.
+
+How is this different from using database monitoring?
+=====================================================
+
+When you run a database like MySQL or Postgresql, there's lots of ways to see
+activity in the database; you can list out statistics regarding connections,
+transactions, threads / processes in use, and in most cases you can integrate
+these server-side statistics with collectd itself to watch trends in real time.
+
+However, while gathering stats from the server can provide insights into
+activity, including being able to look at the originating host as well as the
+specific database(s) being accessed by each client, in a large scale
+environment it's difficult to get a unified, real-time picture for how each
+process on each host is making use of its database connections, especially if
+there are additional layers of indirection between application and
+databases present, such as proxy servers like HAProxy, ProxySQL or PGBouncer,
+as well as when databases and/or applications are containerized and potentially
+hopping over additional network translation layers.   This kind of analysis
+requires being able to relate database connections reported by the database
+to the originating hosts and individual processes on each host.
+
+SQLAlchemy-oriented applications usually make use of process-local connection pools as
+well, and it is valuable to be able to see how well these pools are being
+utilized, which includes being able to see how many connections are sitting
+idle vs. how often does the application need to  create new connections in
+order to respond to requests.   These are still things that can probably be
+gleaned from the database itself from things like connection idle time, but
+especially when layers of indirection are in place, it's simpler to get the
+performance metrics you care about (e.g., how well are the **applications**
+performing) from the applications themselves, as they can give you the exact
+information about what they are doing without having to reverse-engineer it
+from database servers and network status.
+
+Of course, this assumes the applications are Python applications using
+SQLAlchemy.   Which of course they should be! :)
+
+Installation
+============
+
+To use SQLAlchemy-collectd, you need to have:
+
+* SQLAlchemy-collectd installed as a Python library alongside SQLAlchemy
+  itself, in all Python environments that run a SQLAlchemy-oriented
+  application.
+
+* The collectd service itself somewhere on the network.
+
+* The collectd-python plugin, which may be delivered as a separate package
+  depending on distribution
+
+* SQLAlchemy-collectd installed as a Python library alongside the collectd
+  server itself, either as part of the system Python which collectd-python
+  accesses by default, **or** the SQLAlchemy-collectd application can be
+  extracted into any arbitrary location that can be set up as an additional
+  system path with collectd.
+
+Without using a package manager, SQLAlchemy-collectd can be installed via
+pip using::
+
+	pip install sqlalchemy-collectd
+
+Configuration
+=============
+
+Configuration involves both a client-side configuration as well as a server
+side configuration.  Both are very simple.
+
+Client
+------
+
+SQLAlchemy applications use a database connection URL, usually loaded
+from a configuration system of some kind.  Wherever this URL is for your
+target application, basically add ``?plugin=collectd`` to it (or ``&plugin=collectd``
+if other query parameters already there).  Such as::
+
+	mysql+pymysql://user:password@databasehost/dbname?charset=utf8&plugin=collectd
+
+Using a URL as above, the sqlalchemy-collectd plugin will be pulled in where it
+will attempt to send messages to a collectd server listening on localhost port
+25827 (note this is one higher than the default collectd network plugin port of
+25826).
 
 
-hostname/pid-12345/checkouts
+Destination Host
+^^^^^^^^^^^^^^^^
 
-host  /  plugin   / plugininstance  type / typeinstance
+To send stats to collectd on a different host, add ``collectd_host``
+(currently ipv4 only) and optionally ``collectd_port``::
 
-# use real types, requires custom types.db w/ awkward configuration
-hostname/sqlalchemy-nova/checkouts-12345
-hostname/sqlalchemy-nova/transactions-12345
-hostname/sqlalchemy-nova/checkedout-12345
-hostname/sqlalchemy-nova/pooled-12345
-hostname/sqlalchemy-nova/connected-12345
+	mysql+pymysql://user:password@databasehost/dbname?charset=utf8&plugin=collectd&collectd_host=172.18.5.2&collectd_port=25827
 
-# another one w/ a "wide" value
+Program Name
+^^^^^^^^^^^^
 
-# key:
-# host / plugin-plugininstance / type-typeinstance
+Another important configuration is the "program name" - this is the application
+name that sqlalchemy-collectd will report within statistics.   Within a particular
+"program name" on a particular host, statistics are **aggregated across all
+processes**, regardless of parent process.
 
-# we will use this layout, "configured-name" is part of the
-# sqlalchemy url conf, e.g  mysql://nova:pw@hostname/nova?plugin=sqlalchemy-collectd&collectd_name=nova
+By default, the "program name" comes from ``sys.argv[0]``, but this is not
+always what's desired; for example, if you're running from within mod_wsgi,
+this will likely return ``httpd`` which is more vague that most would prefer.
+Additionally, a single application might create connections to multiple
+databases for different purposes, and one might want to separate the reporting
+for these into different sections.  To set up this program name, add
+``collectd_program_name``::
 
-# host / sqlalchemy-<configured-name> / <sqlalchemy custom type>-<process id>
+	mysql+pymysql://user:password@databasehost/dbname?charset=utf8&plugin=collectd&collectd_program_name=nova_api&collectd_host=172.18.5.2
 
+With the above URL, all Python processes that use this URL on a single host
+will aggregate their connection use statistics under the name ``nova_api``.
 
-# for the values, when we see a "gauge" thats a number we report directly,
-# when we see a "derived", collectd can turn that into a rate over time, e.g.
-# checkouts / sec  transactions / sec
+TODO
+^^^^
 
-# so say nova has process ids 123 and 4567, neutron has procss ids 9856 and 786,
-
-hostname/sqlalchemy-nova/sqlalchemy_pool-123   numpools=gauge checkedout=gauge overflow=gauge pooled=gauge total=gauge
-hostname/sqlalchemy-nova/sqlalchemy_transactions-123   count=gauge
-hostname/sqlalchemy-nova/sqlalchemy_checkouts-123   count=derived
-hostname/sqlalchemy-nova/sqlalchemy_commits-123   count=derived
-hostname/sqlalchemy-nova/sqlalchemy_rollbacks-123   count=derived
-hostname/sqlalchemy-nova/sqlalchemy_invalidated-123   count=derived
-
-
-hostname/sqlalchemy-neutron/sqlalchemy_pool-9865   numpools=gauge checkedout=gauge overflow=gauge pooled=gauge total=gauge
-hostname/sqlalchemy-neutron/sqlalchemy_checkouts-9865   count=derived
-hostname/sqlalchemy-neutron/sqlalchemy_transactions-9865   count=derived
-hostname/sqlalchemy-neutron/sqlalchemy_pool-786   numpools=gauge checkedout=gauge overflow=gauge pooled=gauge total=gauge
-hostname/sqlalchemy-neutron/sqlalchemy_checkouts-786   count=derived
-hostname/sqlalchemy-neutron/sqlalchemy_transactions-786   count=derived
+We can add options so that stats are still grouped under parent pids, that
+is instead of using ``<progname>`` as the classifier we use
+``<progname>-<parentpid>``, like ``nova_api-15840`` vs. ``nova_api-4573``, etc.
+Of course we can report on the raw subprocess identifiers as well but this
+doesn't appear to be that useful.
 
 
-# then we're going to use the <Plugin "aggregation"> to flatten out the
-# process id part of it so that we get the stats per program / database URL
-# overall, then a second <Plugin "aggregation"> will further take that
-# and get us the stats per hostname, that's what will be sent to graphite
-# out of the box.
+The plugin will transparently spawn a background thread for each individual process
+that starts up which also connects to the database (don't worry, these work
+if you are using gevent, eventlet, asyncio, gunicorn, etc.  threads are your
+friend and they miss you very much!).
+
+After the URL is configured, the vast majority of applications probably
+need to be restarted for the change to take effect.
+
+Server
+------
+
+sqlalchemy-collectd uses a Python plugin, so in your collectd.conf or in a
+collectd.d/sqlalchemy.conf file, assuming a system-installed sqlalchemy-collectd::
+
+	LoadPlugin python
+	<Plugin python>
+	    LogTraces true
+
+	    Import "sqlalchemy_collectd.server.plugin"
+
+	    <Module "sqlalchemy_collectd.server.plugin">
+	        listen "0.0.0.0" 25827
+	    </Module>
+	</Plugin>
+
+Above, the plugin will listen for UDP on port 25827 of the default network
+interface.  It can also be configured to listen on "localhost" or any
+other IP number (currently ipv4 only) on the host.
+
+Custom Module Path
+^^^^^^^^^^^^^^^^^^
+
+To reference sqlalchemy-collectd extracted into an arbitrary file location,
+add ``ModulePath``::
+
+	LoadPlugin python
+	<Plugin python>
+		ModulePath "/path/to/sqlalchemy-collectd/"
+	    LogTraces true
+
+	    Import "sqlalchemy_collectd.server.plugin"
+
+	    <Module "sqlalchemy_collectd.server.plugin">
+	        listen "0.0.0.0" 25827
+	    </Module>
+	</Plugin>
+
+For further information about the Python plugin system see
+`collectd-python <https://collectd.org/documentation/manpages/collectd-python.5.shtml>`_.
+
+The collectd server is typically restarted for the configurational change
+to take effect.
+
+Stats
+=====
+
+Now that sqlalchemy-collectd is running, what stats can we see?
+
+Supposing we have the plugin turned on for the applications ``neutron``
+and ``nova``, the namespace we would see in a tool like graphana would
+look like::
+
+	hostname
+		sqlalchemy-host
+			count-checkedin
+			count-checkedout
+			count-connections
+			count-detached
+			count-invalidated
+			count-numpools
+			count-numprocs
+			derive-checkouts
+			derive-connects
+			derive-disconnects
+			derive-invalidated
+			derive-commits
+			derive-rollbacks
+			derive-transactions
+
+		sqlalchemy-neutron
+			count-checkedin
+			count-checkedout
+			count-connections
+			count-detached
+			... everything else
+
+		sqlalchemy-nova
+			count-checkedin
+			count-checkedout
+			count-connections
+			count-detached
+			... everything else
+
+Above, we first see that all stats are grouped per-hostname.   Within that,
+we have a fixed *plugin instance* called "host", which renders as ``sqlalchemy-host``.
+This represents aggregated statistics for the entire host, that is, statistics
+that take into account all database connections used by all applications (that
+use sqlalchemy-collectd) on this particular host.
+
+Following that, we can see there are groups for the individual ``program_name``
+we set up, for ``nova`` and ``neutron`` we get stats aggregated for that
+name specifically.
+
+The statistics themselves are labeled ``count-<name>`` or ``derive-<name>``,
+which correspond to pre-supplied collectd types ``count`` and ``derive`` (see
+the sidebar for what this is about).    The stats labeled ``count`` are
+integers representing the current count of a resource or activity:
+
+* ``count-checkedin`` - current number of connections that are checked in to the
+  connection pool
+
+* ``count-checkedout`` - current number of connections that are checked out from
+  the connection pool, e.g. are in use by the application to talk to the
+  database.
+
+* ``count-connections`` - total number of connections to the database at this moment,
+  checked out, checked in, detached, or soft-invalidated.
+
+* ``count-detached`` - total number of connections that are **detached**; meaning
+  they have been disconnected from the engine/pool using the ``.detach()``
+  method but are still being used as a database connection.
+
+* ``count-invalidated`` - total number of connections that have been **explicitly**
+  invalidated, meaning, the ``.invalidate()`` method has been called
+  individually for a connection.  In this state, there may or may not be a
+  database connection present for each of these, depending on if the
+  invalidation was "hard" or "soft".  Invalidation usually corresponds to a
+  connection that reported a problem in being able to communicate with the
+  database, and for which an error was raised.  For this reason, the
+  "invalidated" count should be considered to be roughly an "error" counter -
+  each count here  usually corresponds to a connectivity error encountered by
+  the application to which it responded by invalidating the connection, which
+  results either in immediate or eventual reconnection.
+
+  For most invalidation scenarios, the entire pool of connections is
+  invalidated at once using a "freshness" timestamp; any connection older than
+  this timestamp is refreshed on next use.  This is to suit the case of assuming
+  that the database was probably restarted, so all connections need to be
+  reconnected.  These connections which have been **implicitly** invalidated
+  are **not** included in this count.
+
+  Since an invalidated connection is usually discarded immediately, this
+  number as a running count should be very low, unless the database is down in
+  which case you'll see a spike.The ``derive-invalidated`` value should be
+  consulted as well which provides an ongoing *rate* of invalidation.
+
+* ``count-numpools`` - the number of connection pools in use.  A SQLAlchemy
+  ``Engine`` features exactly one connection pool.  If an application connects
+  to two different database URLs in a process and creates two different
+  ``Engine`` objects, then you'd have two pools.  If that same application
+  spawns off into ten subprocesses, then you have 20 or 22 pools in use,
+  depending on how the parent uses the database also.   Use ``count-numpools``
+  to make sure this number is what you expect.  A poorly written application
+  that is spawning a brand new ``Engine`` for each request will have a
+  dramatically larger number here (as well as one that is changing constantly)
+  and that is an immediate red flag that the application should be fixed.
+
+* ``count-numprocs`` - the total number of Python processes, e.g. parent and
+  subprocesses, that are contributing to the connection statistics in this
+  group.   This number will match ``count-numpools`` if you have one
+  ``Engine`` per process.
+
+  Both the ``count-numpools`` and ``count-numprocs`` values provide context to
+  when one looks at the total connections and  checkouts. If connection pools
+  are configured to allow at most 20 connections max, and you have 10
+  connection pools on the host, now you can have 200  connections max to your
+  database.
+
+The stats labeled ``derive`` are floating point values representing a
+**rate** of activity.   sqlalchemy-collectd sends these numbers to the
+collectd server as a total number of events occurred as of a specific
+timestamp; collectd then compares this to the previous value to determine
+the rate.  How the rate is reported (e.g. number per second, etc.) depends
+on the reporting tools being used.
+
+* ``derive-checkouts`` - rate of connections being checked out.
+
+* ``derive-connects`` - rate of new connections made to the database
+
+* ``derive-disconnects`` - rate of database connections being closed
+
+* ``derive-invalidated`` - rate of connections that are explicitly **invalidated**,
+  e.g. have encountered a connectivity error which made the program invalidate
+  the connection.  The application may or may not have tried to connect
+  again immediately depending on how it is using this feature.
+
+* ``derive-commits`` - (TODO: not implemented yet) rate of calls to ``transaction.commit()``.  This value
+  can be used to estimate TPS, e.g. transactions per second, however note that
+  this is limited to SQLAlchemy-explicit transactions where the Engine-level
+  begin() / commit() methods are being invoked.   When using the SQLAlchemy
+  ORM with the ``Session``, this rate should be tracking the rate of
+  calls to ``Session.commit()``.
+
+* ``derive-rollbacks`` - (TODO: not implemented yet) rate of calls to ``transaction.rollback()``.
+
+* ``derive-transactions`` - (TODO: not implemented yet) rate of transactions overall.  This should add up
+  to the commit and rollback rates combined, however may be higher than that
+  if the application also discards transactions and/or ``Session`` objects
+  without calling ``.commit()`` or ``.rollback()``.
 
 
+.. topic Collectd types
 
-hostname/sqlalchemy-nova/sqlalchemy_checkouts-12345   count=derived
-hostname/sqlalchemy-nova/sqlalchemy_transactions-12345   count=derived
-
-
-
-# alternate - but no way to aggregate b.c. can't aggregate on regexp
-hostname/sqlalchemy-nova-12345/derive-checkouts
-hostname/sqlalchemy-nova-12345/derive-transactions
-hostname/sqlalchemy-nova-12345/gauge-checkedout
-hostname/sqlalchemy-nova-12345/gauge-pooled
-hostname/sqlalchemy-nova-12345/gauge-connected
-
-# alternate #2
-hostname/sqlalchemy-12345/derive-nova-checkouts    value
-hostname/sqlalchemy-12345/derive-nova-transactions value
-hostname/sqlalchemy-12345/gauge-nova-checkedout  value
-hostname/sqlalchemy-12345/gauge-nova-pooled      value
-hostname/sqlalchemy-12345/gauge-nova-connected   value
-
-# with #2, aggregate on host, type instance, gives us:
-hostname/sqlalchemy/derive-nova-checkouts    value
-hostname/sqlalchemy/derive-nova-transactions value
-hostname/sqlalchemy/gauge-nova-checkedout  value
-hostname/sqlalchemy/gauge-nova-pooled      value
-hostname/sqlalchemy/gauge-nova-connected   value
-
-# but! still can't aggregate across nova/neutron/etc
-
-
-
-
-
-<Plugin "aggregation">
-  <Aggregation>
-	# translate from:
-	#
-	# <host>/<plugin>-<program-name>/<type>-<process pid>
-	#
-	# hostname/sqlalchemy-nova/checkouts-12345
-	# hostname/sqlalchemy-nova/checkouts-5839
-	# hostname/sqlalchemy-nova/checkouts-9905
-	# hostname/sqlalchemy-neutron/checkouts-19385
-	# hostname/sqlalchemy-neutron/checkouts-6991
-	#
-	# to:
-	#
-	# <host>/<plugin>-<program-name>/<type>
-	#
-	# hostname/sqlalchemy-nova/checkouts
-	# hostname/sqlalchemy-neutron/checkouts
-
-    Plugin "sqlalchemy"
-
-    GroupBy "Host"
-    GroupBy "PluginInstance"
-
-	CalculateNum true
-    CalculateSum true
-    CalculateAverage true
-  </Aggregation>
-
-  <Aggregation>
-	# translate from:
-	#
-	# <host>/<plugin>-<program-name>/<type>-<process pid>
-	#
-	# hostname/sqlalchemy-nova/checkouts-12345
-	# hostname/sqlalchemy-nova/checkouts-5839
-	# hostname/sqlalchemy-nova/checkouts-9905
-	# hostname/sqlalchemy-neutron/checkouts-19385
-	# hostname/sqlalchemy-neutron/checkouts-6991
-	#
-	# to:
-	#
-	# <host>/<plugin>-all/<type>
-	#
-	# hostname/sqlalchemy-all/checkouts
-
-    Plugin "sqlalchemy"
-
-    GroupBy "Host"
-    SetPluginInstance "all"
-
-    CalculateSum true
-    CalculateAverage true
-  </Aggregation>
-
-
-</Plugin>
-
-# send all SQLAlchemy messages to the aggregation plugin,
-# and don't send them anywhere else, thereby filtering out the
-# per-PID messages.
-LoadPlugin "match_regex"
-<Chain "PostCache">
-  <Rule>
-    <Match regex>
-      Plugin "^sqlalchemy$"
-    </Match>
-    <Target write>
-      Plugin "aggregation"
-    </Target>
-    Target stop
-  </Rule>
-</Chain>
-
-
-[{"values":[1069067],"dstypes":["derive"],"dsnames":["value"],"time":1517512597.320,"interval":10.000,"host":"photon2","plugin":"cpu","plugin_instance":"2","type":"cpu","type_instance":"idle"}]
-
-
-[{"values":[0.31,0.34,0.28],"dstypes":["gauge","gauge","gauge"],"dsnames":["shortterm","midterm","longterm"],"time":1517512718.495,"interval":10.000,"host":"photon2","plugin":"load","plugin_instance":"","type":"load","type_instance":""}]
-
-
-hostname/pid-12345/checkins
-hostname/pid-12345/checkouts
-
-
-
-{
-	"host": "foobar.host",
-	"plugin": "sqlalchemy",
-	"plugin_instance": "<pid>",
-	"type": "progname",
-	"type_instance": "nova",
-	"current_connections": 108,    (gauge)
-	"current_checkouts": 25,       (gauge)
-	"checkouts": 38975,     (counter)
-	"checkins": 38972,      (counter)
-	"transactions": 38932          (counter)
-}
-
-
-
- [{"values":[0,0],"dstypes":["derive","derive"],"dsnames":["rx","tx"],"time":1517372403.790,"interval":10.000,"host":"photon2","plugin":"interface","plugin_instance":"virbr2","type":"if_errors","type_instance":""}]
-Jan 30 23:20:03 photon2 collectd[26416]: write_log values:
-                                         [{"values":[0,0],"dstypes":["derive","derive"],"dsnames":["rx","tx"],"time":1517372403.790,"interval":10.000,"host":"photon2","plugin":"interface","plugin_instance":"virbr3-nic","type":"if_packets","type_instance":""}]
-Jan 30 23:20:03 photon2 collectd[26416]: write_log values:
-                                         [{"values":[0,0],"dstypes":["derive","derive"],"dsnames":["rx","tx"],"time":1517372403.790,"interval":10.000,"host":"photon2","plugin":"interface","plugin_instance":"virbr2","type":"if_dropped","type_instance":""}]
-Jan 30 23:20:03 photon2 collectd[26416]: write_log values:
-                                         [{"values":[0,0],"dstypes":["derive","derive"],"dsnames":["rx","tx"],"time":1517372403.790,"interval":10.000,"host":"photon2","plugin":"interface","plugin_instance":"virbr3-nic","type":"if_octets","type_instance":""}]
-
-
-
+	These funny names ``count-`` and ``derive-`` are an artifact of how
+	collectd provides **types**.  collectd has a fixed list of "types" which it
+	lists in a file called ``types.db``. The server does not accept type names
+	that are not either in this file or in a separately configured custom types file,
+	as each type is accompanied by a template for what kinds of values it
+	carries.  Annoyingly, collectd does not let us add these names within the
+	regular .conf file, which would make it very easy for us to include
+	our own custom names; it instead requires they be listed in completely separate file that must be
+	explicitly referred to by absolute path within a conf file, and then to
+	make matters worse when this option is used, we have to uncomment the location
+	of the default types.db file in the central collectd.conf else it will
+	no longer be able to find it.  Given the choice between "very nice names"
+	and "no need to set up three separate config files", we chose the latter :)

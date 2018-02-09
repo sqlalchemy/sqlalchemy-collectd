@@ -12,6 +12,23 @@ from . import collector
 class Plugin(CreateEnginePlugin):
     def __init__(self, url, kwargs):
         self.url = url
+        self.config = {}
+        self._get_argument(
+            "collectd_host", "collectd_host", self.config, url, kwargs)
+        self._get_argument(
+            "collectd_port", "collectd_port", self.config, url, kwargs)
+        self._get_argument(
+            "collectd_report_host", "hostname", self.config, url, kwargs)
+        self._get_argument(
+            "collectd_program_name", "progname", self.config, url, kwargs)
+
+    def _get_argument(self, name, dest_name, dest, url, kwargs):
+        # favor the URL but pop the name from both
+        if name in kwargs:
+            dest[dest_name] = kwargs.pop(name)
+
+        if name in url.query:
+            dest[dest_name] = url.query.pop(name)
 
     def handle_dialect_kwargs(self, dialect_cls, dialect_args):
         """parse and modify dialect kwargs"""
@@ -26,16 +43,18 @@ class Plugin(CreateEnginePlugin):
         registering engine or connection pool events.
 
         """
-        start_plugin(engine)
+        start_plugin(engine, **self.config)
 
 
-def start_plugin(engine):
-    # TODO: all this configurable
-    hostname = socket.gethostname()
-    progname = sys.argv[0]
+def start_plugin(
+        engine, hostname=None, progname=None,
+        collectd_host="localhost", collectd_port=25827):
 
-    collectd_hostname = "localhost"
-    collectd_port = 25827
+    if hostname is None:
+        hostname = socket.gethostname()
+
+    if progname is None:
+        progname = sys.argv[0]
 
     sender_ = sender.Sender(hostname, progname)
     collection_target = collector.CollectionTarget.collection_for_name(
@@ -43,10 +62,9 @@ def start_plugin(engine):
     collector.EngineCollector(collection_target, engine)
 
     connection = protocol.ClientConnection.for_host_port(
-        collectd_hostname, collectd_port)
+        collectd_host, collectd_port)
 
     worker.add_target(
         connection,
         collection_target,
         sender_)
-
