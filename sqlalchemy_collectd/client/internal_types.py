@@ -6,7 +6,7 @@ pool = protocol.Type(
     ("checkedout", protocol.VALUE_GAUGE),
     ("checkedin", protocol.VALUE_GAUGE),
     ("detached", protocol.VALUE_GAUGE),
-    ("invalidated", protocol.VALUE_GAUGE),
+    # ("invalidated", protocol.VALUE_GAUGE),
     ("connections", protocol.VALUE_GAUGE),
 )
 

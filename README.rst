@@ -248,7 +248,6 @@ look like::
 			count-checkedout
 			count-connections
 			count-detached
-			count-invalidated
 			count-numpools
 			count-numprocs
 			derive-checkouts
@@ -302,30 +301,6 @@ integers representing the current count of a resource or activity:
   they have been disconnected from the engine/pool using the ``.detach()``
   method but are still being used as a database connection.
 
-* ``count-invalidated`` - total number of connections that have been **explicitly**
-  invalidated, meaning, the ``.invalidate()`` method has been called
-  individually for a connection.  In this state, there may or may not be a
-  database connection present for each of these, depending on if the
-  invalidation was "hard" or "soft".  Invalidation usually corresponds to a
-  connection that reported a problem in being able to communicate with the
-  database, and for which an error was raised.  For this reason, the
-  "invalidated" count should be considered to be roughly an "error" counter -
-  each count here  usually corresponds to a connectivity error encountered by
-  the application to which it responded by invalidating the connection, which
-  results either in immediate or eventual reconnection.
-
-  For most invalidation scenarios, the entire pool of connections is
-  invalidated at once using a "freshness" timestamp; any connection older than
-  this timestamp is refreshed on next use.  This is to suit the case of assuming
-  that the database was probably restarted, so all connections need to be
-  reconnected.  These connections which have been **implicitly** invalidated
-  are **not** included in this count.
-
-  Since an invalidated connection is usually discarded immediately, this
-  number as a running count should be very low, unless the database is down in
-  which case you'll see a spike.The ``derive-invalidated`` value should be
-  consulted as well which provides an ongoing *rate* of invalidation.
-
 * ``count-numpools`` - the number of connection pools in use.  A SQLAlchemy
   ``Engine`` features exactly one connection pool.  If an application connects
   to two different database URLs in a process and creates two different
@@ -364,7 +339,8 @@ on the reporting tools being used.
 * ``derive-invalidated`` - rate of connections that are explicitly **invalidated**,
   e.g. have encountered a connectivity error which made the program invalidate
   the connection.  The application may or may not have tried to connect
-  again immediately depending on how it is using this feature.
+  again immediately depending on how it is using this feature.  See the
+  section on "invalidated connections" below for details on this.
 
 * ``derive-commits`` - (TODO: not implemented yet) rate of calls to ``transaction.commit()``.  This value
   can be used to estimate TPS, e.g. transactions per second, however note that
@@ -380,19 +356,48 @@ on the reporting tools being used.
   if the application also discards transactions and/or ``Session`` objects
   without calling ``.commit()`` or ``.rollback()``.
 
+Invalidated Connections
+^^^^^^^^^^^^^^^^^^^^^^^
 
-.. topic Collectd types
+The ``derive-invalidated`` stat records the rate of invalidations.
 
-	These funny names ``count-`` and ``derive-`` are an artifact of how
-	collectd provides **types**.  collectd has a fixed list of "types" which it
-	lists in a file called ``types.db``. The server does not accept type names
-	that are not either in this file or in a separately configured custom types file,
-	as each type is accompanied by a template for what kinds of values it
-	carries.  Annoyingly, collectd does not let us add these names within the
-	regular .conf file, which would make it very easy for us to include
-	our own custom names; it instead requires they be listed in completely separate file that must be
-	explicitly referred to by absolute path within a conf file, and then to
-	make matters worse when this option is used, we have to uncomment the location
-	of the default types.db file in the central collectd.conf else it will
-	no longer be able to find it.  Given the choice between "very nice names"
-	and "no need to set up three separate config files", we chose the latter :)
+By invalidated, we mean the ``.invalidated()`` method on the connection
+is called, which marks this connection as no longer usable and marks it
+for refresh on next use (soft invalidation) or more commonly closes it
+immediately (hard invalidation).   Typically, when a connection is invalidated,
+the application is either pre-pinging the database and will try to connect
+again, or it was in the middle of an operation when the database got
+cut off, in which case depending on how the application was designed it
+may or may not try the operation again.
+
+Invalidation usually corresponds to a
+connection that reported a problem in being able to communicate with the
+database, and for which an error was raised.  For this reason, the
+"invalidated" rate should be considered to be roughly an "error" rate -
+each count here usually corresponds to a connectivity error encountered by the
+application to which it responded by invalidating the connection, which results
+either in immediate or eventual reconnection.
+
+For most invalidation scenarios, the entire pool of connections is
+invalidated at once using a "freshness" timestamp; any connection older than
+this timestamp is refreshed on next use.  This is to suit the case of assuming
+that the database was probably restarted, so all connections need to be
+reconnected.  These connections which have been **implicitly** invalidated
+are **not** included in this count.
+
+Collectd Types
+^^^^^^^^^^^^^^^
+
+These funny names ``count-`` and ``derive-`` are an artifact of how
+collectd provides **types**.  collectd has a fixed list of "types" which it
+lists in a file called ``types.db``. The server does not accept type names
+that are not either in this file or in a separately configured custom types file,
+as each type is accompanied by a template for what kinds of values it
+carries.  Annoyingly, collectd does not let us add these names within the
+regular .conf file, which would make it very easy for us to include
+our own custom names; it instead requires they be listed in completely separate file that must be
+explicitly referred to by absolute path within a conf file, and then to
+make matters worse when this option is used, we have to uncomment the location
+of the default types.db file in the central collectd.conf else it will
+no longer be able to find it.  Given the choice between "very nice names"
+and "no need to set up three separate config files", we chose the latter :)

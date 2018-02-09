@@ -21,7 +21,9 @@ class CollectionTarget(object):
         # or were checked in
         self.checkedin = set()
 
-        # note these are prior to being closed and/or discarded
+        # not clear if this is useful yet.  only "soft" invalidated
+        # will actually be present.  still counting them so that
+        # we can return an accurate checkout count.
         self.invalidated = set()
 
         # detached connections.
