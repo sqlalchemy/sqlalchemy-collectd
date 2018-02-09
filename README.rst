@@ -172,6 +172,18 @@ for these into different sections.  To set up this program name, add
 With the above URL, all Python processes that use this URL on a single host
 will aggregate their connection use statistics under the name ``nova_api``.
 
+Startup
+^^^^^^^
+
+After the URL is configured, the vast majority of applications probably
+need to be restarted for the change to take effect.
+
+The plugin will transparently spawn a background thread for each individual process
+that starts up which also connects to the database (don't worry, these work
+if you are using gevent, eventlet, asyncio, gunicorn, etc.  threads are your
+friend).
+
+
 TODO
 ^^^^
 
@@ -182,13 +194,6 @@ Of course we can report on the raw subprocess identifiers as well but this
 doesn't appear to be that useful.
 
 
-The plugin will transparently spawn a background thread for each individual process
-that starts up which also connects to the database (don't worry, these work
-if you are using gevent, eventlet, asyncio, gunicorn, etc.  threads are your
-friend and they miss you very much!).
-
-After the URL is configured, the vast majority of applications probably
-need to be restarted for the change to take effect.
 
 Server
 ------
