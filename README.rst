@@ -13,8 +13,9 @@ database dialect.
 
 sqlalchemy-collectd is oriented towards providing a unified view of
 application-side database metrics in sprawling, many-host / many-process
-application clusters with multiple databases, proxy servers, dozens of
-applications or containers and hundreds of processes on dozens of hosts.
+environments that may make use of any number of topologically complicating
+technologies such as database clusters, proxy servers, large numbers of
+client applications, multi-process applications, and containers.
 
 What's collectd?
 ================
