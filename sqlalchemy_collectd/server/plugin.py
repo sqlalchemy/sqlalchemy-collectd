@@ -12,16 +12,24 @@ log = logging.getLogger(__name__)
 receiver_ = None
 
 
-# TODO: merge collectd.notice w/ python logging?
-def _notice(msg):
-    collectd.notice("[sqlalchemy-collectd] %s" % msg)
+class CollectdHandler(logging.Handler):
+    levels = {
+        logging.INFO: collectd.info,
+        logging.WARN: collectd.warning,
+        logging.ERROR: collectd.error,
+        logging.DEBUG: collectd.info,
+        logging.CRITICAL: collectd.error,
+
+    }
+
+    def emit(self, record):
+        fn = self.levels[record.levelno]
+        fn(record.msg % record.args)
 
 
 def get_config(config):
     global aggregator_
 
-    _notice("sqlalchemy_collectd plugin version %s" % __version__)
-    _notice("Python version: %s" % sys.version)
     start_plugin(config)
 
 
@@ -30,6 +38,18 @@ def start_plugin(config):
 
     config_dict = {elem.key: tuple(elem.values) for elem in config.children}
     host, port = config_dict.get("listen", ("localhost", 25827))
+
+    logging.getLogger().addHandler(CollectdHandler())
+
+    loglevel = {
+        "warn": logging.WARN, "error": logging.ERROR,
+        "debug": logging.DEBUG, "info": logging.INFO
+    }[config_dict.get("loglevel", ("info", ))[0]]
+
+    logging.getLogger().setLevel(loglevel)
+
+    log.info("sqlalchemy_collectd plugin version %s", __version__)
+    log.info("Python version: %s", sys.version)
 
     receiver_ = receiver.Receiver()
     connection = protocol.ServerConnection(host, int(port))

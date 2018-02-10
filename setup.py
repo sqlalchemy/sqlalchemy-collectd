@@ -41,4 +41,9 @@ setup(
     setup_requires=['pytest-runner'],
     zip_safe=False,
     install_requires=requires,
+    entry_points={
+        'sqlalchemy.plugins': [
+            'collectd = sqlalchemy_collectd.client.plugin.Plugin'
+        ]
+    }
 )

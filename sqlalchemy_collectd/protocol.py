@@ -2,6 +2,7 @@
 connect straight to the network plugin.
 
 """
+import collections
 import struct
 import socket
 import logging
@@ -149,7 +150,58 @@ class MessageSender(object):
 
         payload = self.type._encode_values(*values)
 
+        log.debug("send: %s", _SendMsg(self, values))
         connection.send(header_ + payload)
+
+    def __str__(self):
+        return (
+            "(host=%r, plugin=%r, plugin_instance=%r, "
+            "type=%r, type_instance=%r, interval=%r)" % (
+                self.host, self.plugin, self.plugin_instance,
+                self.type.name, self.type_instance, self.interval
+            )
+        )
+
+
+class _SendMsg(collections.namedtuple('sendmsg', ['sender', 'values'])):
+    def __str__(self):
+        sender = self.sender
+        type_ = sender.type
+        return (
+            "(host=%r, plugin=%r, plugin_instance=%r, "
+            "type=%r, type_instance=%r, interval=%r, values=%s)" % (
+                sender.host, sender.plugin, sender.plugin_instance,
+                type_.name, sender.type_instance, sender.interval,
+                ", ".join(
+                    "%s=%s" % (field_name, value)
+                    for field_name, value in zip(type_.names, self.values)
+                )
+            )
+        )
+
+
+class _RecvMsg(collections.namedtuple("receivemsg", ['result', 'type'])):
+
+    def __str__(self):
+        if self.type:
+            type_names = self.type.names
+        else:
+            type_names = ["(unknown)" for value in self.result[TYPE_VALUES]]
+
+        return (
+            "(host=%r, plugin=%r, plugin_instance=%r, "
+            "type=%r, type_instance=%r, interval=%r, values=%s)" % (
+                self.result[TYPE_HOST], self.result[TYPE_PLUGIN],
+                self.result[TYPE_PLUGIN_INSTANCE],
+                self.result[TYPE_TYPE], self.result[TYPE_TYPE_INSTANCE],
+                self.result[TYPE_INTERVAL],
+                ", ".join(
+                    "%s=%s" % (field_name, value)
+                    for field_name, value
+                    in zip(type_names, self.result[TYPE_VALUES])
+                )
+            )
+        )
 
 
 class MessageReceiver(object):
@@ -171,6 +223,7 @@ class MessageReceiver(object):
     def receive(self, buf):
         result = self._unpack_packet(buf)
         type_name = result[TYPE_TYPE]
+        type_ = None
         try:
             type_ = self._types[type_name]
         except KeyError:
@@ -183,6 +236,8 @@ class MessageReceiver(object):
                 for name, value in zip(type_._field_names, result[TYPE_VALUES])
             }
             return result
+        finally:
+            log.debug("receive: %s", _RecvMsg(result, type_))
 
     def _unpack_packet(self, buf):
         pos = 0
@@ -257,7 +312,6 @@ class ClientConnection(object):
         self._mutex.acquire()
         try:
             self._check_connect()
-            log.debug("sending: %r", message)
             self.socket.sendto(message, (self.host, self.port))
         except IOError:
             log.error("Error in socket.sendto", exc_info=True)
