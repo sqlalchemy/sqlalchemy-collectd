@@ -8,8 +8,9 @@ transaction metrics used by Python applications to the
 
 sqlalchemy-collectd works as a SQLAlchemy plugin invoked via the database URL,
 so can be used in any SQLAlchemy application (1.1 or greater) that accepts
-arbitrary connections URLs with no code changes whatsoever, as well as with any
-database dialect.
+arbitrary connection URLs.   The plugin is loaded using setuptools
+entrypoints and no code changes to the application are required.   There
+are no dependencies on database backends or drivers.
 
 sqlalchemy-collectd is oriented towards providing a unified view of
 application-side database metrics in sprawling, many-host / many-process
@@ -23,8 +24,8 @@ What's collectd?
 collectd is a statistics collection daemon that is easy to run.   It serves as
 a collector and re-broadcaster of runtime statistics for a wide variety of
 performance and other metrics.   Once a set of stats are in collectd, they can
-be broadcast out virtually anywhere, including to `RRD
-<https://oss.oetiker.ch/rrdtool/>_` databases and front-ends, to metrics
+be broadcast out virtually anywhere, including to `RRD <https://oss.oetiker.ch/rrdtool/>_`
+databases and front-ends, to metrics
 reporting applications like `Graphite <https://graphiteapp.org/>`_ and `Grafana
 <https://grafana.com/>`_, and to `other collectd servers
 <https://collectd.org/wiki/index.php/Networking_introduction>`_.
@@ -234,7 +235,11 @@ add ``ModulePath``::
 	    Import "sqlalchemy_collectd.server.plugin"
 
 	    <Module "sqlalchemy_collectd.server.plugin">
+	    	# ipv4 only for the moment
 	        listen "0.0.0.0" 25827
+
+	        # set to "debug" to show messages received
+	        loglevel "info"
 	    </Module>
 	</Plugin>
 
@@ -302,8 +307,9 @@ name specifically.
 
 The statistics themselves are labeled ``count-<name>`` or ``derive-<name>``,
 which correspond to pre-supplied collectd types ``count`` and ``derive`` (see
-the sidebar for what this is about).    The stats labeled ``count`` are
-integers representing the current count of a resource or activity:
+"collectd types" below for why the naming is done this way).  The stats labeled
+``count`` are integers representing the current count of a resource or
+activity:
 
 * ``count-checkedin`` - current number of connections that are checked in to the
   connection pool
@@ -407,7 +413,7 @@ Collectd Types
 --------------
 
 These funny names ``count-`` and ``derive-`` are an artifact of how
-collectd provides **types**.  collectd has a fixed list of "types" which it
+collectd provides *types*.  collectd has a fixed list of "types" which it
 lists in a file called ``types.db``. The server does not accept type names
 that are not either in this file or in a separately configured custom types file,
 as each type is accompanied by a template for what kinds of values it
