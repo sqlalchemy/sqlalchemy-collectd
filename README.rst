@@ -208,7 +208,11 @@ collectd.d/sqlalchemy.conf file, assuming a system-installed sqlalchemy-collectd
 	    Import "sqlalchemy_collectd.server.plugin"
 
 	    <Module "sqlalchemy_collectd.server.plugin">
+	    	# ipv4 only for the moment
 	        listen "0.0.0.0" 25827
+
+	        # set to "debug" to show messages received
+	        loglevel "info"
 	    </Module>
 	</Plugin>
 
@@ -239,6 +243,13 @@ For further information about the Python plugin system see
 
 The collectd server is typically restarted for the configurational change
 to take effect.
+
+TODO
+^^^^
+
+* ipv6 support
+
+* security layer (e.g. network packet signing / encryption)
 
 Stats
 =====

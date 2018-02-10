@@ -33,7 +33,7 @@ setup(
     keywords='SQLAlchemy collectd',
     author='Mike Bayer',
     author_email='mike@zzzcomputing.com',
-    url='http://github.org/zzzeek/sqlalchemy-collectd',
+    url='http://github.org/sqlalchemy/sqlalchemy-collectd',
     license='MIT',
     packages=find_packages(".", exclude=["*.tests"]),
     include_package_data=True,
