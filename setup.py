@@ -43,7 +43,7 @@ setup(
     install_requires=requires,
     entry_points={
         'sqlalchemy.plugins': [
-            'collectd = sqlalchemy_collectd.client.plugin.Plugin'
+            'collectd = sqlalchemy_collectd.client.plugin:Plugin'
         ]
     }
 )
