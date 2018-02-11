@@ -1,3 +1,4 @@
+import os
 import socket
 import sys
 
@@ -54,7 +55,7 @@ def start_plugin(
         hostname = socket.gethostname()
 
     if progname is None:
-        progname = sys.argv[0]
+        progname = os.path.basename(sys.argv[0])
 
     sender_ = sender.Sender(hostname, progname)
     collection_target = collector.CollectionTarget.collection_for_name(
