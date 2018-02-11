@@ -1,6 +1,7 @@
 *.pyc
 *.pyo
 *.egg
+*.db
 /build/
 /dist/
 /docs/build/output/
