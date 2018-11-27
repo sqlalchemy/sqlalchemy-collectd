@@ -1,6 +1,6 @@
-recursive-include **/tests *.py
-
-include *.conf
+recursive-include **/tests *.py  
+recursive-include examples *
+include *.conf 
 include README* LICENSE changelog.rst tox.ini
 
 
