@@ -57,7 +57,7 @@ setup(
     author_email='mike@zzzcomputing.com',
     url='https://github.com/sqlalchemy/sqlalchemy-collectd',
     license='MIT',
-    packages=find_packages(".", exclude=["*.tests"]),
+    packages=find_packages(".", exclude=["examples*", "*.tests"]),
     include_package_data=True,
     tests_require=['pytest', 'mock'],
     cmdclass={'test': PyTest},
