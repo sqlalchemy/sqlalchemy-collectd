@@ -8,10 +8,6 @@ Changelog
     :include_notes_from: unreleased_changes
 
 .. changelog::
-    :version: 0.0.4
-    :include_notes_from: unreleased_changes
-
-.. changelog::
     :version: 0.0.3
     :released: November 27, 2018
 
