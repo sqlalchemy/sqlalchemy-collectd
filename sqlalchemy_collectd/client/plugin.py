@@ -4,10 +4,10 @@ import sys
 
 from sqlalchemy.engine import CreateEnginePlugin
 
-from .. import protocol
+from . import collector
 from . import sender
 from . import worker
-from . import collector
+from .. import protocol
 
 
 class Plugin(CreateEnginePlugin):
@@ -15,13 +15,17 @@ class Plugin(CreateEnginePlugin):
         self.url = url
         self.config = {}
         self._get_argument(
-            "collectd_host", "collectd_host", self.config, url, kwargs)
+            "collectd_host", "collectd_host", self.config, url, kwargs
+        )
         self._get_argument(
-            "collectd_port", "collectd_port", self.config, url, kwargs)
+            "collectd_port", "collectd_port", self.config, url, kwargs
+        )
         self._get_argument(
-            "collectd_report_host", "hostname", self.config, url, kwargs)
+            "collectd_report_host", "hostname", self.config, url, kwargs
+        )
         self._get_argument(
-            "collectd_program_name", "progname", self.config, url, kwargs)
+            "collectd_program_name", "progname", self.config, url, kwargs
+        )
 
     def _get_argument(self, name, dest_name, dest, url, kwargs):
         # favor the URL but pop the name from both
@@ -48,8 +52,12 @@ class Plugin(CreateEnginePlugin):
 
 
 def start_plugin(
-        engine, hostname=None, progname=None,
-        collectd_host="localhost", collectd_port=25827):
+    engine,
+    hostname=None,
+    progname=None,
+    collectd_host="localhost",
+    collectd_port=25827,
+):
 
     if hostname is None:
         hostname = socket.gethostname()
@@ -59,13 +67,12 @@ def start_plugin(
 
     sender_ = sender.Sender(hostname, progname)
     collection_target = collector.CollectionTarget.collection_for_name(
-        progname)
+        progname
+    )
     collector.EngineCollector(collection_target, engine)
 
     connection = protocol.ClientConnection.for_host_port(
-        collectd_host, collectd_port)
+        collectd_host, collectd_port
+    )
 
-    worker.add_target(
-        connection,
-        collection_target,
-        sender_)
+    worker.add_target(connection, collection_target, sender_)

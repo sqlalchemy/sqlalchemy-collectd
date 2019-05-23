@@ -1,10 +1,11 @@
+import logging
+
 import collectd
 
-from .. import protocol
 from . import aggregator
+from .. import protocol
 from ..client import internal_types
 
-import logging
 log = logging.getLogger(__name__)
 
 
@@ -22,10 +23,7 @@ def summarizes(protocol_type):
 class Receiver(object):
     def __init__(self, plugin="sqlalchemy"):
         self.plugin = plugin
-        self.internal_types = [
-            internal_types.pool,
-            internal_types.totals
-        ]
+        self.internal_types = [internal_types.pool, internal_types.totals]
         self.message_receiver = protocol.MessageReceiver(*self.internal_types)
 
         self.aggregator = aggregator.Aggregator(
@@ -58,33 +56,45 @@ def _summarize_pool_stats(receiver, type_, timestamp):
         type="count",
         plugin=receiver.plugin,
         time=timestamp,
-        interval=receiver.aggregator.interval
+        interval=receiver.aggregator.interval,
     )
-    for hostname, progname, numrecs, stats in \
-            receiver.aggregator.get_stats_by_progname(
-                type_.name, timestamp, sum):
+    for (
+        hostname,
+        progname,
+        numrecs,
+        stats,
+    ) in receiver.aggregator.get_stats_by_progname(type_.name, timestamp, sum):
         for name, value in zip(type_.names, stats):
             values.dispatch(
-                host=hostname, plugin_instance=progname,
+                host=hostname,
+                plugin_instance=progname,
                 type_instance=name,
-                values=[value]
+                values=[value],
             )
 
         values.dispatch(
-            host=hostname, plugin_instance=progname,
-            type_instance="numprocs", values=[numrecs])
+            host=hostname,
+            plugin_instance=progname,
+            type_instance="numprocs",
+            values=[numrecs],
+        )
 
     for hostname, numrecs, stats in receiver.aggregator.get_stats_by_hostname(
-            type_.name, timestamp, sum):
+        type_.name, timestamp, sum
+    ):
         for name, value in zip(type_.names, stats):
             values.dispatch(
-                host=hostname, plugin_instance="host",
+                host=hostname,
+                plugin_instance="host",
                 type_instance=name,
-                values=[value]
+                values=[value],
             )
         values.dispatch(
-            host=hostname, plugin_instance="host",
-            type_instance="numprocs", values=[numrecs])
+            host=hostname,
+            plugin_instance="host",
+            type_instance="numprocs",
+            values=[numrecs],
+        )
 
 
 @summarizes(internal_types.totals)
@@ -93,25 +103,30 @@ def _summarize_totals(receiver, type_, timestamp):
         type="derive",
         plugin=receiver.plugin,
         time=timestamp,
-        interval=receiver.aggregator.interval
+        interval=receiver.aggregator.interval,
     )
 
-    for hostname, progname, numrecs, stats in \
-            receiver.aggregator.get_stats_by_progname(
-                type_.name, timestamp, sum):
+    for (
+        hostname,
+        progname,
+        numrecs,
+        stats,
+    ) in receiver.aggregator.get_stats_by_progname(type_.name, timestamp, sum):
         for name, value in zip(type_.names, stats):
             values.dispatch(
-                host=hostname, plugin_instance=progname,
+                host=hostname,
+                plugin_instance=progname,
                 type_instance=name,
-                values=[value]
+                values=[value],
             )
 
     for hostname, numrecs, stats in receiver.aggregator.get_stats_by_hostname(
-            type_.name, timestamp, sum):
+        type_.name, timestamp, sum
+    ):
         for name, value in zip(type_.names, stats):
             values.dispatch(
-                host=hostname, plugin_instance="host",
+                host=hostname,
+                plugin_instance="host",
                 type_instance=name,
-                values=[value]
+                values=[value],
             )
-

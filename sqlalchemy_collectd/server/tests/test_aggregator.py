@@ -1,6 +1,5 @@
-import mock
-import unittest
 import random
+import unittest
 
 from .. import aggregator
 
@@ -50,10 +49,7 @@ class TimeBucketTest(unittest.TestCase):
         agg.put(50574, "key", "value_50574")
 
         # now it's gone
-        self.assertRaises(
-            KeyError,
-            agg.get_data, 50539
-        )
+        self.assertRaises(KeyError, agg.get_data, 50539)
 
     def test_series(self):
         agg = aggregator.TimeBucket(4, 10)
@@ -66,9 +62,13 @@ class TimeBucketTest(unittest.TestCase):
                 else:
                     assert previous_time // 10 == time // 10
                     self.assertEqual(
-                        max([bucket["data"].get("key", '')
-                            for bucket in agg.buckets]),
-                        value
+                        max(
+                            [
+                                bucket["data"].get("key", "")
+                                for bucket in agg.buckets
+                            ]
+                        ),
+                        value,
                     )
             else:
                 agg.put(time, "key", "value_%s" % time)

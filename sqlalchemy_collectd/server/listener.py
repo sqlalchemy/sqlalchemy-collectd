@@ -8,8 +8,7 @@ def _receive(connection, receiver):
 
 def listen(connection, receiver):
     listen_thread = threading.Thread(
-        target=_receive, args=(connection, receiver))
+        target=_receive, args=(connection, receiver)
+    )
     listen_thread.daemon = True
     listen_thread.start()
-
-

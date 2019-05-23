@@ -11,7 +11,8 @@ class Aggregator(object):
         self.buckets = {name: TimeBucket(4, interval) for name in bucket_names}
 
     def set_stats(
-            self, bucket_name, hostname, progname, pid, timestamp, values):
+        self, bucket_name, hostname, progname, pid, timestamp, values
+    ):
 
         bucket = self.buckets[bucket_name]
         records = bucket.get_data(timestamp)
@@ -25,8 +26,10 @@ class Aggregator(object):
         ):
             recs = [records[key] for key in keys]
             yield (
-                hostname, progname, len(recs),
-                [agg_func(coll) for coll in zip(*recs)]
+                hostname,
+                progname,
+                len(recs),
+                [agg_func(coll) for coll in zip(*recs)],
             )
 
     def get_stats_by_hostname(self, bucket_name, timestamp, agg_func):
@@ -76,18 +79,17 @@ class TimeBucket(object):
     has data from the old range it had B buckets ago, we empty it out first.
 
     """
-    __slots__ = 'num_buckets', 'buckets', 'interval'
+
+    __slots__ = "num_buckets", "buckets", "interval"
 
     def __init__(self, num_buckets, interval):
         self.num_buckets = num_buckets
-        self.buckets = [
-            {"slot": None, "data": {}} for i in range(num_buckets)
-        ]
+        self.buckets = [{"slot": None, "data": {}} for i in range(num_buckets)]
         self.interval = interval
 
     def _get_bucket(self, timestamp):
         timestamp = int(timestamp)
-        slot = (timestamp // self.interval)
+        slot = timestamp // self.interval
         bucket_num = slot % self.num_buckets
         bucket = self.buckets[bucket_num]
         bucket_slot = bucket["slot"]
@@ -101,10 +103,10 @@ class TimeBucket(object):
         return bucket
 
     def put(self, timestamp, key, data):
-        self._get_bucket(timestamp)['data'][key] = data
+        self._get_bucket(timestamp)["data"][key] = data
 
     def get(self, current_time, key):
-        return self._get_bucket(current_time)['data'].get(key)
+        return self._get_bucket(current_time)["data"].get(key)
 
     def get_data(self, current_time):
-        return self._get_bucket(current_time)['data']
+        return self._get_bucket(current_time)["data"]

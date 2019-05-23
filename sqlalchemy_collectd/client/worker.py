@@ -1,7 +1,7 @@
-import os
-import time
-import threading
 import logging
+import os
+import threading
+import time
 
 log = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ def _check_threads_started():
     if _WORKER_THREAD is None or _PID != ospid:
 
         _PID = ospid
-        _WORKER_THREAD = threading.Thread(target=_process, args=(5, ))
+        _WORKER_THREAD = threading.Thread(target=_process, args=(5,))
         _WORKER_THREAD.daemon = True
         _WORKER_THREAD.start()
 
@@ -30,17 +30,18 @@ def _process(interval):
     while True:
         now = time.time()
         for (
-                collection_target, connection,
-                sender, last_called) in _collection_targets:
+            collection_target,
+            connection,
+            sender,
+            last_called,
+        ) in _collection_targets:
             if now - last_called[0] > interval:
                 last_called[0] = now
                 sender.send(connection, collection_target, now, interval, pid)
 
-        time.sleep(.2)
+        time.sleep(0.2)
 
 
 def add_target(connection, collection_target, sender):
-    _collection_targets.append(
-        (collection_target, connection, sender, [0])
-    )
+    _collection_targets.append((collection_target, connection, sender, [0]))
     _check_threads_started()

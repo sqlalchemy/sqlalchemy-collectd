@@ -1,11 +1,13 @@
-from .. import __version__
+import logging
 import sys
+import time
+
 import collectd
+
 from . import listener
 from . import receiver
+from .. import __version__
 from .. import protocol
-import time
-import logging
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +21,6 @@ class CollectdHandler(logging.Handler):
         logging.ERROR: collectd.error,
         logging.DEBUG: collectd.info,
         logging.CRITICAL: collectd.error,
-
     }
 
     def emit(self, record):
@@ -42,9 +43,11 @@ def start_plugin(config):
     logging.getLogger().addHandler(CollectdHandler())
 
     loglevel = {
-        "warn": logging.WARN, "error": logging.ERROR,
-        "debug": logging.DEBUG, "info": logging.INFO
-    }[config_dict.get("loglevel", ("info", ))[0]]
+        "warn": logging.WARN,
+        "error": logging.ERROR,
+        "debug": logging.DEBUG,
+        "info": logging.INFO,
+    }[config_dict.get("loglevel", ("info",))[0]]
 
     logging.getLogger().setLevel(loglevel)
 

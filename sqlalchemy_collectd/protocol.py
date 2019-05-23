@@ -3,11 +3,11 @@ connect straight to the network plugin.
 
 """
 import collections
-import struct
-import socket
 import logging
-import threading
 import os
+import socket
+import struct
+import threading
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ _value_formats = {
     VALUE_COUNTER: struct.Struct("!Q"),
     VALUE_GAUGE: struct.Struct("<d"),
     VALUE_DERIVE: long_,
-    VALUE_ABSOLUTE: struct.Struct("!Q")
+    VALUE_ABSOLUTE: struct.Struct("!Q"),
 }
 
 
@@ -60,8 +60,11 @@ class Type(object):
     """
 
     __slots__ = (
-        'name', '_value_types', '_value_formats',
-        '_message_template', '_field_names'
+        "name",
+        "_value_types",
+        "_value_formats",
+        "_message_template",
+        "_field_names",
     )
 
     def __init__(self, name, *db_template):
@@ -86,7 +89,8 @@ class Type(object):
         self._field_names = [dsname for dsname, value_type in db_template]
         self._value_types = [value_type for dsname, value_type in db_template]
         self._value_formats = [
-            _value_formats[value_type] for value_type in self._value_types]
+            _value_formats[value_type] for value_type in self._value_types
+        ]
 
         self._message_template = header.pack(
             TYPE_VALUES, 6 + (9 * len(db_template))
@@ -112,15 +116,27 @@ class MessageSender(object):
     """Represents all the fields necessary to send a message."""
 
     __slots__ = (
-        'type', 'host', 'plugin', 'plugin_instance', 'type_instance',
-        'interval', '_host_message_part', '_remainder_message_parts'
+        "type",
+        "host",
+        "plugin",
+        "plugin_instance",
+        "type_instance",
+        "interval",
+        "_host_message_part",
+        "_remainder_message_parts",
     )
 
     def __init__(
-        self, type, host, plugin, plugin_instance=None,
-            type_instance=None, interval=DEFAULT_INTERVAL):
+        self,
+        type_,
+        host,
+        plugin,
+        plugin_instance=None,
+        type_instance=None,
+        interval=DEFAULT_INTERVAL,
+    ):
 
-        self.type = type
+        self.type = type_
         self.host = host
         self.plugin = plugin
         self.plugin_instance = plugin_instance
@@ -129,24 +145,29 @@ class MessageSender(object):
 
         self._host_message_part = self._pack_string(TYPE_HOST, self.host)
         self._remainder_message_parts = (
-            self._pack_string(TYPE_PLUGIN, self.plugin) +
-            self._pack_string(TYPE_PLUGIN_INSTANCE, self.plugin_instance) +
-            self._pack_string(TYPE_TYPE, self.type.name) +
-            struct.pack("!HHq", TYPE_INTERVAL, 12, self.interval) +
-            self._pack_string(TYPE_TYPE_INSTANCE, self.type_instance)
+            self._pack_string(TYPE_PLUGIN, self.plugin)
+            + self._pack_string(TYPE_PLUGIN_INSTANCE, self.plugin_instance)
+            + self._pack_string(TYPE_TYPE, self.type.name)
+            + struct.pack("!HHq", TYPE_INTERVAL, 12, self.interval)
+            + self._pack_string(TYPE_TYPE_INSTANCE, self.type_instance)
         )
 
     def _pack_string(self, typecode, value):
-        return header.pack(
-            typecode, 5 + len(value)) + value.encode('ascii') + b"\0"
+        return (
+            header.pack(typecode, 5 + len(value))
+            + value.encode("ascii")
+            + b"\0"
+        )
 
     def send(self, connection, timestamp, *values):
         """Send a message on a connection."""
 
-        header_ = self._host_message_part + \
-            header.pack(TYPE_TIME, 12) + \
-            long_.pack(int(timestamp)) + \
-            self._remainder_message_parts
+        header_ = (
+            self._host_message_part
+            + header.pack(TYPE_TIME, 12)
+            + long_.pack(int(timestamp))
+            + self._remainder_message_parts
+        )
 
         payload = self.type._encode_values(*values)
 
@@ -156,32 +177,41 @@ class MessageSender(object):
     def __str__(self):
         return (
             "(host=%r, plugin=%r, plugin_instance=%r, "
-            "type=%r, type_instance=%r, interval=%r)" % (
-                self.host, self.plugin, self.plugin_instance,
-                self.type.name, self.type_instance, self.interval
+            "type=%r, type_instance=%r, interval=%r)"
+            % (
+                self.host,
+                self.plugin,
+                self.plugin_instance,
+                self.type.name,
+                self.type_instance,
+                self.interval,
             )
         )
 
 
-class _SendMsg(collections.namedtuple('sendmsg', ['sender', 'values'])):
+class _SendMsg(collections.namedtuple("sendmsg", ["sender", "values"])):
     def __str__(self):
         sender = self.sender
         type_ = sender.type
         return (
             "(host=%r, plugin=%r, plugin_instance=%r, "
-            "type=%r, type_instance=%r, interval=%r, values=%s)" % (
-                sender.host, sender.plugin, sender.plugin_instance,
-                type_.name, sender.type_instance, sender.interval,
+            "type=%r, type_instance=%r, interval=%r, values=%s)"
+            % (
+                sender.host,
+                sender.plugin,
+                sender.plugin_instance,
+                type_.name,
+                sender.type_instance,
+                sender.interval,
                 ", ".join(
                     "%s=%s" % (field_name, value)
                     for field_name, value in zip(type_.names, self.values)
-                )
+                ),
             )
         )
 
 
-class _RecvMsg(collections.namedtuple("receivemsg", ['result', 'type'])):
-
+class _RecvMsg(collections.namedtuple("receivemsg", ["result", "type"])):
     def __str__(self):
         if self.type:
             type_names = self.type.names
@@ -190,16 +220,20 @@ class _RecvMsg(collections.namedtuple("receivemsg", ['result', 'type'])):
 
         return (
             "(host=%r, plugin=%r, plugin_instance=%r, "
-            "type=%r, type_instance=%r, interval=%r, values=%s)" % (
-                self.result[TYPE_HOST], self.result[TYPE_PLUGIN],
+            "type=%r, type_instance=%r, interval=%r, values=%s)"
+            % (
+                self.result[TYPE_HOST],
+                self.result[TYPE_PLUGIN],
                 self.result[TYPE_PLUGIN_INSTANCE],
-                self.result[TYPE_TYPE], self.result[TYPE_TYPE_INSTANCE],
+                self.result[TYPE_TYPE],
+                self.result[TYPE_TYPE_INSTANCE],
                 self.result[TYPE_INTERVAL],
                 ", ".join(
                     "%s=%s" % (field_name, value)
-                    for field_name, value
-                    in zip(type_names, self.result[TYPE_VALUES])
-                )
+                    for field_name, value in zip(
+                        type_names, self.result[TYPE_VALUES]
+                    )
+                ),
             )
         )
 
@@ -216,9 +250,7 @@ class MessageReceiver(object):
             TYPE_VALUES: self._unpack_values,
             TYPE_INTERVAL: self._unpack_long,
         }
-        self._types = {
-            type_.name: type_ for type_ in types
-        }
+        self._types = {type_.name: type_ for type_ in types}
 
     def receive(self, buf):
         result = self._unpack_packet(buf)
@@ -262,7 +294,7 @@ class MessageReceiver(object):
         return long_.unpack_from(buf, header.size)[0]
 
     def _unpack_string(self, type_, length, buf):
-        return buf[header.size:length - 1].decode('ascii')
+        return buf[header.size : length - 1].decode("ascii")
 
     def _unpack_values(self, type_, length, buf):
         num = short.unpack_from(buf, header.size)[0]
@@ -299,8 +331,9 @@ class ClientConnection(object):
         try:
             key = (host, port)
             if key not in cls.connections:
-                cls.connections[key] = connection = \
-                    ClientConnection(host, port)
+                cls.connections[key] = connection = ClientConnection(
+                    host, port
+                )
                 return connection
             else:
                 return cls.connections[key]
@@ -327,4 +360,3 @@ class ServerConnection(object):
     def receive(self):
         data, addr = self.sock.recvfrom(1024)
         return data, addr
-

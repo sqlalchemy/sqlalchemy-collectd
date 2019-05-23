@@ -1,7 +1,9 @@
-from sqlalchemy import event
+import logging
 import threading
 import weakref
-import logging
+
+from sqlalchemy import event
+
 from . import worker
 
 
@@ -56,10 +58,11 @@ class CollectionTarget(object):
 
     @property
     def num_checkedout(self):
-        checkedout = self.connections.\
-            difference(self.detached).\
-            difference(self.invalidated).\
-            difference(self.checkedin)
+        checkedout = (
+            self.connections.difference(self.detached)
+            .difference(self.invalidated)
+            .difference(self.checkedin)
+        )
         return len(checkedout)
 
     @property
@@ -84,7 +87,6 @@ class CollectionTarget(object):
 
 
 class EngineCollector(object):
-
     def __init__(self, collection_target, engine):
         self.collection_target = collection_target
         self.engine = engine
@@ -157,7 +159,8 @@ class EngineCollector(object):
     def _warn_missing_connection(self, dbapi_conn):
         self._warn(
             "connection %s was closed but not part of "
-            "total connections" % dbapi_conn)
+            "total connections" % dbapi_conn
+        )
 
     def _warn(self, msg):
         self.logger.warn(msg)
@@ -179,6 +182,3 @@ class EngineCollector(object):
             self.collection_target.total_disconnects += 1
         except KeyError:
             self._warn_missing_connection(dbapi_conn)
-
-
-
