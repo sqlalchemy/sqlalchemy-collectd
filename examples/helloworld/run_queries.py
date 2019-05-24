@@ -1,17 +1,20 @@
-from sqlalchemy import create_engine
-import random
-import time
-import threading
-import multiprocessing
-
 import logging
+import multiprocessing
+import random
+import threading
+import time
+
+from sqlalchemy import create_engine
+
 logging.basicConfig()
 logging.getLogger("sqlalchemy_collectd").setLevel(logging.DEBUG)
 
-e = create_engine("sqlite:///file.db?plugin=collectd")
 
+def worker(appname):
+    e = create_engine(
+        "sqlite:///file.db?plugin=collectd&collectd_program_name=%s" % appname
+    )
 
-def worker():
     e.dispose()
 
     def screw_w_pool():
@@ -25,7 +28,7 @@ def worker():
                 conn.close()
             time.sleep(random.randint(1, 5))
 
-    threads = [threading.Thread(target=screw_w_pool) for i in range(20)]
+    threads = [threading.Thread(target=screw_w_pool) for i in range(5)]
     for t in threads:
         t.daemon = True
         t.start()
@@ -34,9 +37,12 @@ def worker():
         time.sleep(1)
 
 
-procs = [multiprocessing.Process(target=worker) for i in range(5)]
+procs = [
+    multiprocessing.Process(target=worker, args=(("worker %d" % (i % 20)),))
+    for i in range(50)
+]
 for proc in procs:
-    time.sleep(.5)
+    time.sleep(0.5)
     proc.daemon = True
     proc.start()
 

@@ -5,7 +5,9 @@ import time
 import collectd
 
 from . import listener
+from . import monitor
 from . import receiver
+from . import summarizer
 from .. import __version__
 from .. import protocol
 
@@ -36,9 +38,12 @@ def get_config(config):
 
 def start_plugin(config):
     global receiver_
+    global monitor_
 
     config_dict = {elem.key: tuple(elem.values) for elem in config.children}
     host, port = config_dict.get("listen", ("localhost", 25827))
+
+    monitor_host, monitor_port = config_dict.get("monitor", (None, None))
 
     logging.getLogger().addHandler(CollectdHandler())
 
@@ -55,6 +60,12 @@ def start_plugin(config):
     log.info("Python version: %s", sys.version)
 
     receiver_ = receiver.Receiver()
+
+    if monitor_host is not None and monitor_port is not None:
+        receiver_.monitors.append(
+            monitor.Monitor(monitor_host, int(monitor_port))
+        )
+
     connection = protocol.ServerConnection(host, int(port))
 
     listener.listen(connection, receiver_)
@@ -62,7 +73,7 @@ def start_plugin(config):
 
 def read(data=None):
     now = time.time()
-    receiver_.summarize(now)
+    summarizer.summarize(receiver_, now)
 
 
 collectd.register_config(get_config)
