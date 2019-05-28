@@ -18,7 +18,7 @@ def _check_threads_started():
     if _WORKER_THREAD is None or _PID != ospid:
 
         _PID = ospid
-        _WORKER_THREAD = threading.Thread(target=_process, args=(5,))
+        _WORKER_THREAD = threading.Thread(target=_process, args=(2,))
         _WORKER_THREAD.daemon = True
         _WORKER_THREAD.start()
 

@@ -98,9 +98,16 @@ class Type(object):
         for value_type in self._value_types:
             self._message_template += char.pack(value_type)
 
+    def get_stat_index(self, name):
+        return self._field_names.index(name)
+
     @property
     def names(self):
         return self._field_names
+
+    @property
+    def types(self):
+        return self._value_types
 
     def _encode_values(self, *values):
         """Encode a series of values according to the type template."""
@@ -354,6 +361,8 @@ class ClientConnection(object):
 
 class ServerConnection(object):
     def __init__(self, host, port):
+        self.host = host
+        self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((host, port))
 

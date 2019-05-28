@@ -68,8 +68,9 @@ setup(
     zip_safe=False,
     install_requires=requires,
     entry_points={
+        "console_scripts": ["connmon = sqlalchemy_collectd.connmon.main:main"],
         "sqlalchemy.plugins": [
             "collectd = sqlalchemy_collectd.client.plugin:Plugin"
-        ]
+        ],
     },
 )

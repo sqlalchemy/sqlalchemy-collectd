@@ -6,13 +6,25 @@ def avg(values):
 
 
 class Aggregator(object):
-    def __init__(self, bucket_names, interval=10):
-        self.interval = interval
-        self.buckets = {name: TimeBucket(4, interval) for name in bucket_names}
+    def __init__(self, bucket_names, num_buckets=4):
+        self.buckets = None
+        self.interval = None
+        self.bucket_names = bucket_names
+
+    def _init_buckets(self, interval):
+        # the interval at which we bucket the data has to be longer than
+        # the interval coming in from the messages, since we want to give
+        # enough time for all of them to come in
+        self.interval = interval * 2
+        self.buckets = {
+            name: TimeBucket(4, self.interval) for name in self.bucket_names
+        }
 
     def set_stats(
-        self, bucket_name, hostname, progname, pid, timestamp, values
+        self, bucket_name, hostname, progname, pid, timestamp, values, interval
     ):
+        if not self.interval:
+            self._init_buckets(interval)
 
         bucket = self.buckets[bucket_name]
         records = bucket.get_data(timestamp)
@@ -84,7 +96,10 @@ class TimeBucket(object):
 
     def __init__(self, num_buckets, interval):
         self.num_buckets = num_buckets
-        self.buckets = [{"slot": None, "data": {}} for i in range(num_buckets)]
+        self.buckets = [
+            {"slot": None, "data": {}, "timestamp": 0}
+            for i in range(num_buckets)
+        ]
         self.interval = interval
 
     def _get_bucket(self, timestamp):
@@ -95,9 +110,11 @@ class TimeBucket(object):
         bucket_slot = bucket["slot"]
         if bucket_slot is None:
             bucket["slot"] = slot
+            bucket["timestamp"] = timestamp
         elif bucket_slot < slot:
             bucket["data"].clear()
             bucket["slot"] = slot
+            bucket["timestamp"] = timestamp
         elif bucket_slot > slot:
             raise KeyError()
         return bucket

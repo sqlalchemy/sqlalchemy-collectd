@@ -214,6 +214,7 @@ collectd.d/sqlalchemy.conf file, assuming a system-installed sqlalchemy-collectd
 
 	        # set to "debug" to show messages received
 	        loglevel "info"
+
 	    </Module>
 	</Plugin>
 
@@ -425,3 +426,43 @@ make matters worse when this option is used, we have to uncomment the location
 of the default types.db file in the central collectd.conf else it will
 no longer be able to find it.  Given the choice between "very nice names"
 and "no need to set up three separate config files", we chose the latter :)
+
+connmon mode
+============
+
+As an added feature, the **connmon** UX has now been integrated into SQLAlchemy-collectd.
+This is a console application that displays a "top"-like display of the current
+status of connections.
+
+Using the configuration above, we can add a "monitor" line to our collectd
+server configuration::
+
+
+    LoadPlugin python
+    <Plugin python>
+        LogTraces true
+
+        Import "sqlalchemy_collectd.server.plugin"
+
+        <Module "sqlalchemy_collectd.server.plugin">
+            # ipv4 only for the moment
+            listen "0.0.0.0" 25827
+
+            # set to "debug" to show messages received
+            loglevel "info"
+
+            # connmon monitor port
+            monitor "localhost" 25828
+        </Module>
+    </Plugin>
+
+We can now run "connmon" on localhost port 25828::
+
+    connmon --port 25828
+
+Screenshot of connmon:
+
+|connmon_screenshot|
+
+.. |connmon_screenshot| image:: connmon.png
+   :width: 800
