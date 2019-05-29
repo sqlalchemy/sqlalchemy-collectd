@@ -1,7 +1,6 @@
 recursive-include **/tests *.py  
 recursive-include examples *
-include *.conf 
-include README* LICENSE changelog.rst tox.ini
+include README* LICENSE changelog.rst tox.ini connmon.png
 
 
 
