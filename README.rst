@@ -24,7 +24,7 @@ What's collectd?
 collectd is a statistics collection daemon that is easy to run.   It serves as
 a collector and re-broadcaster of runtime statistics for a wide variety of
 performance and other metrics.   Once a set of stats are in collectd, they can
-be broadcast out virtually anywhere, including to `RRD <https://oss.oetiker.ch/rrdtool/>_`
+be broadcast out virtually anywhere, including to `RRD <https://oss.oetiker.ch/rrdtool/>`_
 databases and front-ends, to metrics
 reporting applications like `Graphite <https://graphiteapp.org/>`_ and `Grafana
 <https://grafana.com/>`_, and to `other collectd servers
