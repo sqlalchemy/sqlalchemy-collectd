@@ -27,19 +27,30 @@ def _process(interval):
     pid = os.getpid()
     log.info("Starting process thread in pid %s", pid)
 
-    while True:
-        now = time.time()
-        for (
-            collection_target,
-            connection,
-            sender,
-            last_called,
-        ) in _collection_targets:
-            if now - last_called[0] > interval:
-                last_called[0] = now
-                sender.send(connection, collection_target, now, interval, pid)
+    try:
+        while True:
+            now = time.time()
+            for (
+                collection_target,
+                connection,
+                sender,
+                last_called,
+            ) in _collection_targets:
+                if now - last_called[0] > interval:
+                    last_called[0] = now
+                    try:
+                        sender.send(
+                            connection, collection_target, now, interval, pid
+                        )
+                    except Exception:
+                        log.error("error sending stats", exc_info=True)
 
-        time.sleep(0.2)
+            time.sleep(0.2)
+    except BaseException as be:
+        log.info(
+            "message sender thread caught %s exception, exiting"
+            % type(be).__name__
+        )
 
 
 def add_target(connection, collection_target, sender):

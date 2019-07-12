@@ -27,7 +27,8 @@ class CollectdHandler(logging.Handler):
 
     def emit(self, record):
         fn = self.levels[record.levelno]
-        fn(record.msg % record.args)
+        record.msg = "[sqlalchemy-collectd] " + record.msg
+        fn(self.format(record))
 
 
 def get_config(config):

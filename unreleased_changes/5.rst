@@ -1,0 +1,8 @@
+.. change::
+    :tags: bug
+    :tickets: 5
+
+    Added error resiliency to the server and client threads, so that exceptions
+    which occur are logged and the thread continues to run. Additionally, fixed
+    the logging handler in the server plugin so that stack traces for errors
+    are added to the output.
