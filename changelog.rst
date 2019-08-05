@@ -4,6 +4,10 @@ Changelog
 ==========
 
 .. changelog::
+    :version: 0.0.6
+    :include_notes_from: unreleased_changes
+
+.. changelog::
     :version: 0.0.5
     :released: August 5, 2019
 
