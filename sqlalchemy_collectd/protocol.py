@@ -261,7 +261,12 @@ class MessageReceiver(object):
 
     def receive(self, buf):
         result = self._unpack_packet(buf)
-        type_name = result[TYPE_TYPE]
+        try:
+            type_name = result[TYPE_TYPE]
+        except KeyError:
+            log.warn("Message did not have TYPE_TYPE block, skipping")
+            return None
+
         type_ = None
         try:
             type_ = self._types[type_name]
