@@ -81,3 +81,24 @@ class CollectDProtocolTest(unittest.TestCase):
             },
             result,
         )
+
+    def test_decode_unknown_type(self):
+        type_ = protocol.Type(
+            "my_type",
+            ("some_val", protocol.VALUE_GAUGE),
+            ("some_other_val", protocol.VALUE_DERIVE),
+        )
+
+        message_receiver = protocol.MessageReceiver(type_)
+        with mock.patch.object(protocol, "log") as log:
+            result = message_receiver.receive(b"asdfjq34kt2n34kjnas")
+        self.assertEqual(result, None)
+        self.assertEqual(
+            log.mock_calls,
+            [
+                mock.call.warn("Message %s not known, skipping", mock.ANY),
+                mock.call.warn(
+                    "Message did not have TYPE_TYPE block, skipping"
+                ),
+            ],
+        )
