@@ -1,8 +1,0 @@
-.. change::
-    :tags: bug, setup
-    :tickets: 6
-
-    Reorganized the tox.ini script so that a plain run of ``tox`` will run
-    against a single interpreter.  The "python setup.py test" command is
-    no longer supported by setuptools and now emits a message that ``tox``
-    should be used.

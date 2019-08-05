@@ -1,9 +1,0 @@
-.. change::
-    :tags: bug, protocol
-    :tickets: 4
-
-    Added additional resiliency to the network protocol, such that if an
-    entirely garbled message is sent to the server (such as making a test
-    connection with nc and sending random characters), the protocol parser
-    reports that the message is invalid rather than producing KeyError due to
-    not being able to locate a message type.

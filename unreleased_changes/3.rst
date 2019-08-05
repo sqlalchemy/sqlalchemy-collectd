@@ -1,7 +1,0 @@
-.. change::
-    :tags: bug, config
-    :tickets: 3
-
-    Fixed bug where the port number included in the SQLAlchemy URL with the
-    collectd_port query string value would not be coerced into an integer,
-    failing when it is passed to the socket send operation.
