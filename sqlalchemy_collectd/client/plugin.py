@@ -18,7 +18,7 @@ class Plugin(CreateEnginePlugin):
             "collectd_host", "collectd_host", self.config, url, kwargs
         )
         self._get_argument(
-            "collectd_port", "collectd_port", self.config, url, kwargs
+            "collectd_port", "collectd_port", self.config, url, kwargs, int
         )
         self._get_argument(
             "collectd_report_host", "hostname", self.config, url, kwargs
@@ -27,13 +27,17 @@ class Plugin(CreateEnginePlugin):
             "collectd_program_name", "progname", self.config, url, kwargs
         )
 
-    def _get_argument(self, name, dest_name, dest, url, kwargs):
+    def _get_argument(self, name, dest_name, dest, url, kwargs, coerce_=None):
         # favor the URL but pop the name from both
         if name in kwargs:
             dest[dest_name] = kwargs.pop(name)
+            if coerce_:
+                dest[dest_name] = coerce_(dest[dest_name])
 
         if name in url.query:
             dest[dest_name] = url.query.pop(name)
+            if coerce_:
+                dest[dest_name] = coerce_(dest[dest_name])
 
     def handle_dialect_kwargs(self, dialect_cls, dialect_args):
         """parse and modify dialect kwargs"""
