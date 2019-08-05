@@ -19,16 +19,36 @@ class PluginTest(unittest.TestCase):
     def test_start_engine_args(self):
         with mock.patch.object(plugin, "start_plugin") as start_plugin:
             url = sqla_url.URL("mysql+pymysql://scott:tiger@localhost/")
-            p = plugin.Plugin(url, {"collectd_host": "127.0.0.1"})
+            p = plugin.Plugin(
+                url, {"collectd_host": "127.0.0.1", "collectd_port": 5678}
+            )
             engine = mock.Mock()
             p.engine_created(engine)
 
         self.assertEqual(
-            [mock.call(engine, collectd_host="127.0.0.1")],
+            [mock.call(engine, collectd_host="127.0.0.1", collectd_port=5678)],
             start_plugin.mock_calls,
         )
 
     def test_start_url_args(self):
+        with mock.patch.object(plugin, "start_plugin") as start_plugin:
+            url = sqla_url.make_url(
+                "mysql+pymysql://scott:tiger@localhost/"
+                "?collectd_host=127.0.0.1&somekey=somevalue&collectd_port=1234"
+            )
+            kwargs = {"unrelated": "bar"}
+            p = plugin.Plugin(url, kwargs)
+            engine = mock.Mock()
+            p.engine_created(engine)
+
+        self.assertEqual(
+            [mock.call(engine, collectd_host="127.0.0.1", collectd_port=1234)],
+            start_plugin.mock_calls,
+        )
+        self.assertEqual({"somekey": "somevalue"}, url.query)
+        self.assertEqual({"unrelated": "bar"}, kwargs)
+
+    def test_start_url_args_no_port(self):
         with mock.patch.object(plugin, "start_plugin") as start_plugin:
             url = sqla_url.make_url(
                 "mysql+pymysql://scott:tiger@localhost/"
@@ -50,16 +70,16 @@ class PluginTest(unittest.TestCase):
         with mock.patch.object(plugin, "start_plugin") as start_plugin:
             url = sqla_url.make_url(
                 "mysql+pymysql://scott:tiger@localhost/"
-                "?collectd_host=127.0.0.1"
+                "?collectd_host=127.0.0.1&collectd_port=1234"
             )
-            kwargs = {"collectd_host": "172.18.0.2"}
+            kwargs = {"collectd_host": "172.18.0.2", "collectd_port": 5678}
             p = plugin.Plugin(url, kwargs)
             engine = mock.Mock()
             p.engine_created(engine)
 
         # argument is popped from both but favors url argument
         self.assertEqual(
-            [mock.call(engine, collectd_host="127.0.0.1")],
+            [mock.call(engine, collectd_host="127.0.0.1", collectd_port=1234)],
             start_plugin.mock_calls,
         )
         self.assertEqual({}, url.query)
