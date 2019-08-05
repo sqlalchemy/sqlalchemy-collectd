@@ -1,5 +1,5 @@
 .. change::
-    :tags: bug, protocl
+    :tags: bug, protocol
     :tickets: 4
 
     Added additional resiliency to the network protocol, such that if an
