@@ -8,27 +8,13 @@ from . import listener
 from . import monitor
 from . import receiver
 from . import summarizer
+from .logging import CollectdHandler
 from .. import __version__
 from .. import protocol
 
 log = logging.getLogger(__name__)
 
 receiver_ = None
-
-
-class CollectdHandler(logging.Handler):
-    levels = {
-        logging.INFO: collectd.info,
-        logging.WARN: collectd.warning,
-        logging.ERROR: collectd.error,
-        logging.DEBUG: collectd.info,
-        logging.CRITICAL: collectd.error,
-    }
-
-    def emit(self, record):
-        fn = self.levels[record.levelno]
-        record.msg = "[sqlalchemy-collectd] " + record.msg
-        fn(self.format(record))
 
 
 def get_config(config):
@@ -62,12 +48,23 @@ def start_plugin(config):
 
     receiver_ = receiver.Receiver()
 
+    connection = protocol.ServerConnection(host, int(port))
+    log.info(
+        "sqlalchemy.collectd server listening for "
+        "SQLAlchemy clients on UDP %s %d" % (host, port)
+    )
+
     if monitor_host is not None and monitor_port is not None:
+        # this use is deprecated; a separate connmon plugin should be set up
         receiver_.monitors.append(
             monitor.Monitor(monitor_host, int(monitor_port))
         )
-
-    connection = protocol.ServerConnection(host, int(port))
+        log.info(
+            "sqlalchemy.collectd forwarding local SQLAlchemy "
+            "messages to connmon clients on %s %d",
+            monitor_host,
+            monitor_port,
+        )
 
     listener.listen(connection, receiver_)
 

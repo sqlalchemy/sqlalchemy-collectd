@@ -24,3 +24,9 @@ totals = protocol.Type(
     ("connects", protocol.VALUE_DERIVE),
     ("disconnects", protocol.VALUE_DERIVE),
 )
+
+type_by_value_name = {}
+
+for typ_ in (pool, transactions, totals):
+    for name in typ_.names:
+        type_by_value_name[name] = typ_

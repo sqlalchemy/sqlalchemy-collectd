@@ -6,9 +6,11 @@ from ..client import internal_types
 
 log = logging.getLogger(__name__)
 
+COLLECTD_PLUGIN_NAME = "sqlalchemy"
+
 
 class Receiver(object):
-    def __init__(self, plugin="sqlalchemy"):
+    def __init__(self, plugin=COLLECTD_PLUGIN_NAME):
         self.plugin = plugin
         self.internal_types = [internal_types.pool, internal_types.totals]
         self.message_receiver = protocol.MessageReceiver(*self.internal_types)
