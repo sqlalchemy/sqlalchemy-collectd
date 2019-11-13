@@ -43,6 +43,7 @@ def _send_pool(message_sender, connection, collection_target, timestamp):
         collection_target.num_detached,
         # collection_target.num_invalidated,
         collection_target.num_connections,
+        collection_target.num_processes,
     )
 
 

@@ -45,10 +45,12 @@ class HostProg(object):
         self.connection_count = stats[pool.get_stat_index("connections")]
         self.max_connections = max(self.max_connections, self.connection_count)
 
-    def update_total_stats(self, interval, timestamp, stats, numrecs):
+        self.process_count = stats[pool.get_stat_index("processes")]
+        self.max_process_count = max(
+            self.process_count, self.max_process_count
+        )
 
-        self.max_process_count = max(self.max_process_count, numrecs)
-        self.process_count = numrecs
+    def update_total_stats(self, interval, timestamp, stats):
 
         total_checkouts = stats[totals.get_stat_index("checkouts")]
         if self.total_checkouts == -1:
@@ -112,7 +114,6 @@ class Stat(object):
             for (
                 hostname,
                 progname,
-                numrecs,
                 stats,
             ) in self.aggregator.get_stats_by_progname(
                 "sqlalchemy_totals", timestamp, sum
@@ -121,13 +122,12 @@ class Stat(object):
                     hostname, progname, hostprogs_seen
                 )
                 hostprog.update_total_stats(
-                    self.aggregator.interval, timestamp, stats, numrecs
+                    self.aggregator.interval, timestamp, stats
                 )
 
             for (
                 hostname,
                 progname,
-                numrecs,
                 stats,
             ) in self.aggregator.get_stats_by_progname(
                 "sqlalchemy_pool", timestamp, sum

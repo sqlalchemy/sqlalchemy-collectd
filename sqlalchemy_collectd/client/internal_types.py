@@ -8,6 +8,7 @@ pool = protocol.Type(
     ("detached", protocol.VALUE_GAUGE),
     # ("invalidated", protocol.VALUE_GAUGE),
     ("connections", protocol.VALUE_GAUGE),
+    ("processes", protocol.VALUE_GAUGE),
 )
 
 transactions = protocol.Type(

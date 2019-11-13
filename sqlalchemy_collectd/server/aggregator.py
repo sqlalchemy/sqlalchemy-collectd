@@ -37,12 +37,7 @@ class Aggregator(object):
             sorted(records), key=lambda rec: (rec[0], rec[1])
         ):
             recs = [records[key] for key in keys]
-            yield (
-                hostname,
-                progname,
-                len(recs),
-                [agg_func(coll) for coll in zip(*recs)],
-            )
+            yield (hostname, progname, [agg_func(coll) for coll in zip(*recs)])
 
     def get_stats_by_hostname(self, bucket_name, timestamp, agg_func):
         bucket = self.buckets[bucket_name]
@@ -51,7 +46,7 @@ class Aggregator(object):
             sorted(records), key=lambda rec: rec[0]
         ):
             recs = [records[key] for key in keys]
-            yield hostname, len(recs), [agg_func(coll) for coll in zip(*recs)]
+            yield hostname, [agg_func(coll) for coll in zip(*recs)]
 
 
 class TimeBucket(object):
