@@ -1,3 +1,5 @@
+# TODO: this goes away, is replaced by types.py
+
 from .. import protocol
 
 pool = protocol.Type(
@@ -8,7 +10,7 @@ pool = protocol.Type(
     ("detached", protocol.VALUE_GAUGE),
     # ("invalidated", protocol.VALUE_GAUGE),
     ("connections", protocol.VALUE_GAUGE),
-    ("processes", protocol.VALUE_GAUGE),
+    ("numprocs", protocol.VALUE_GAUGE),
 )
 
 transactions = protocol.Type(

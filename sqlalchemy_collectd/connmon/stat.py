@@ -45,7 +45,7 @@ class HostProg(object):
         self.connection_count = stats[pool.get_stat_index("connections")]
         self.max_connections = max(self.max_connections, self.connection_count)
 
-        self.process_count = stats[pool.get_stat_index("processes")]
+        self.process_count = stats[pool.get_stat_index("numprocs")]
         self.max_process_count = max(
             self.process_count, self.max_process_count
         )

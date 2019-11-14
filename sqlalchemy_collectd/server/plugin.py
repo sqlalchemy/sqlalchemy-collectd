@@ -1,5 +1,4 @@
 import logging
-import sys
 import time
 
 import collectd
@@ -9,7 +8,6 @@ from . import monitor
 from . import receiver
 from . import summarizer
 from .logging import CollectdHandler
-from .. import __version__
 from .. import protocol
 
 log = logging.getLogger(__name__)
@@ -32,19 +30,10 @@ def start_plugin(config):
 
     monitor_host, monitor_port = config_dict.get("monitor", (None, None))
 
-    logging.getLogger().addHandler(CollectdHandler())
-
-    loglevel = {
-        "warn": logging.WARN,
-        "error": logging.ERROR,
-        "debug": logging.DEBUG,
-        "info": logging.INFO,
-    }[config_dict.get("loglevel", ("info",))[0]]
-
-    logging.getLogger().setLevel(loglevel)
-
-    log.info("sqlalchemy_collectd plugin version %s", __version__)
-    log.info("Python version: %s", sys.version)
+    CollectdHandler.setup(__name__, config_dict.get("loglevel", ("info",))[0])
+    CollectdHandler.setup(
+        protocol.__name__, config_dict.get("loglevel", ("info",))[0]
+    )
 
     receiver_ = receiver.Receiver()
 

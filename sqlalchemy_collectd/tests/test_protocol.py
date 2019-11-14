@@ -43,17 +43,22 @@ class CollectDProtocolTest(unittest.TestCase):
             ("some_other_val", protocol.VALUE_DERIVE),
         )
 
-        sender = protocol.MessageSender(
-            type_,
-            "somehost",
-            "someplugin",
-            "someplugininstance",
-            "sometypeinstance",
+        sender = protocol.MessageSender(type_)
+
+        value = protocol.Values(
+            type="my_type",
+            host="somehost",
+            plugin="someplugin",
+            plugin_instance="someplugininstance",
+            type_instance="sometypeinstance",
         )
 
         connection = mock.Mock()
 
-        sender.send(connection, 1517607042.95968, 25.809, 450)
+        sender.send(
+            connection,
+            value.build(time=1517607042.95968, values=[25.809, 450]),
+        )
 
         self.assertEqual([mock.call(self.message)], connection.send.mock_calls)
 
@@ -67,18 +72,16 @@ class CollectDProtocolTest(unittest.TestCase):
         message_receiver = protocol.MessageReceiver(type_)
         result = message_receiver.receive(self.message)
         self.assertEqual(
-            {
-                protocol.TYPE_HOST: "somehost",
-                protocol.TYPE_TIME: 1517607042,
-                protocol.TYPE_PLUGIN: "someplugin",
-                protocol.TYPE_PLUGIN_INSTANCE: "someplugininstance",
-                protocol.TYPE_TYPE: "my_type",
-                protocol.TYPE_TYPE_INSTANCE: "sometypeinstance",
-                protocol.TYPE_VALUES: [25.809, 450],
-                protocol.TYPE_INTERVAL: 10,
-                "type": type_,
-                "values": {"some_other_val": 450, "some_val": 25.809},
-            },
+            protocol.Values(
+                type="my_type",
+                host="somehost",
+                plugin="someplugin",
+                plugin_instance="someplugininstance",
+                type_instance="sometypeinstance",
+                values=[25.809, 450],
+                interval=10,
+                time=1517607042,
+            ),
             result,
         )
 

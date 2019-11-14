@@ -1,3 +1,8 @@
+# TODO: most of this should be replaced by protocol.Values and generic
+# translation functions set up in types.py for "internal types" vs.
+# "external types"; this will be one of the stream translators
+
+
 import collectd
 
 from ..client import internal_types
@@ -35,7 +40,6 @@ def _summarize_pool_stats(receiver, type_, timestamp):
     for (
         hostname,
         progname,
-        numrecs,
         stats,
     ) in receiver.aggregator.get_stats_by_progname(type_.name, timestamp, sum):
         for name, value in zip(type_.names, stats):
@@ -46,14 +50,7 @@ def _summarize_pool_stats(receiver, type_, timestamp):
                 values=[value],
             )
 
-        values.dispatch(
-            host=hostname,
-            plugin_instance=progname,
-            type_instance="numprocs",
-            values=[numrecs],
-        )
-
-    for hostname, numrecs, stats in receiver.aggregator.get_stats_by_hostname(
+    for hostname, stats in receiver.aggregator.get_stats_by_hostname(
         type_.name, timestamp, sum
     ):
         for name, value in zip(type_.names, stats):
@@ -63,12 +60,6 @@ def _summarize_pool_stats(receiver, type_, timestamp):
                 type_instance=name,
                 values=[value],
             )
-        values.dispatch(
-            host=hostname,
-            plugin_instance="host",
-            type_instance="numprocs",
-            values=[numrecs],
-        )
 
 
 @summarizes(internal_types.totals)
@@ -83,7 +74,6 @@ def _summarize_totals(receiver, type_, timestamp):
     for (
         hostname,
         progname,
-        numrecs,
         stats,
     ) in receiver.aggregator.get_stats_by_progname(type_.name, timestamp, sum):
         for name, value in zip(type_.names, stats):
@@ -94,7 +84,7 @@ def _summarize_totals(receiver, type_, timestamp):
                 values=[value],
             )
 
-    for hostname, numrecs, stats in receiver.aggregator.get_stats_by_hostname(
+    for hostname, stats in receiver.aggregator.get_stats_by_hostname(
         type_.name, timestamp, sum
     ):
         for name, value in zip(type_.names, stats):

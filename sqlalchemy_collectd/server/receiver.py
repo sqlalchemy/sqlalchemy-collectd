@@ -26,14 +26,14 @@ class Receiver(object):
         for monitor in self.monitors:
             monitor.forward(data)
 
-        message = self.message_receiver.receive(data)
-        type_name = message[protocol.TYPE_TYPE]
-        timestamp = message[protocol.TYPE_TIME]
-        host = message[protocol.TYPE_HOST]
-        progname = message[protocol.TYPE_PLUGIN_INSTANCE]
-        values = message[protocol.TYPE_VALUES]
-        pid = message[protocol.TYPE_TYPE_INSTANCE]
-        interval = message[protocol.TYPE_INTERVAL]
+        values_obj = self.message_receiver.receive(data)
+        type_name = values_obj.type
+        timestamp = values_obj.time
+        host = values_obj.host
+        progname = values_obj.plugin_instance
+        values = values_obj.values
+        pid = values_obj.type_instance
+        interval = values_obj.interval
         self.aggregator.set_stats(
             type_name, host, progname, pid, timestamp, values, interval
         )
