@@ -116,7 +116,7 @@ class Stat(object):
                 progname,
                 stats,
             ) in self.aggregator.get_stats_by_progname(
-                "sqlalchemy_totals", timestamp, sum
+                "sqlalchemy_totals", timestamp
             ):
                 hostprog = self._get_hostprog(
                     hostname, progname, hostprogs_seen
@@ -130,7 +130,7 @@ class Stat(object):
                 progname,
                 stats,
             ) in self.aggregator.get_stats_by_progname(
-                "sqlalchemy_pool", timestamp, sum
+                "sqlalchemy_pool", timestamp
             ):
                 hostprog = self._get_hostprog(
                     hostname, progname, hostprogs_seen

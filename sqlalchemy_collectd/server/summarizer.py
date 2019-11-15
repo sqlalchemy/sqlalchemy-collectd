@@ -12,7 +12,7 @@ _summarizers = {}
 
 
 def summarize(receiver, timestamp):
-    if receiver.aggregator.interval is None:
+    if not receiver.aggregator.ready:
         return
 
     for type_ in receiver.internal_types:
@@ -32,19 +32,17 @@ def summarizes(protocol_type):
 @summarizes(internal_types.pool_internal)
 def _summarize_pool_stats(receiver, type_, timestamp):
     values = collectd.Values(
-        type="count",
-        plugin=receiver.plugin,
-        time=timestamp,
-        interval=receiver.aggregator.interval,
+        type="count", plugin=receiver.plugin, time=timestamp
     )
     for (
         hostname,
         progname,
         stats,
     ) in receiver.aggregator.get_stats_by_progname(type_.name, timestamp, sum):
-        print("Summarize values by progname: %s" % stats)
+        #        print("Summarize values by progname: %s" % stats)
         for name, value in zip(type_.names, stats.values):
             values.dispatch(
+                interval=stats.interval,
                 host=hostname,
                 plugin_instance=progname,
                 type_instance=name,
@@ -54,9 +52,10 @@ def _summarize_pool_stats(receiver, type_, timestamp):
     for hostname, stats in receiver.aggregator.get_stats_by_hostname(
         type_.name, timestamp, sum
     ):
-        print("Summarize values by hostname: %s" % stats)
+        #        print("Summarize values by hostname: %s" % stats)
         for name, value in zip(type_.names, stats.values):
             values.dispatch(
+                interval=stats.interval,
                 host=hostname,
                 plugin_instance="host",
                 type_instance=name,
@@ -67,20 +66,18 @@ def _summarize_pool_stats(receiver, type_, timestamp):
 @summarizes(internal_types.totals_internal)
 def _summarize_totals(receiver, type_, timestamp):
     values = collectd.Values(
-        type="derive",
-        plugin=receiver.plugin,
-        time=timestamp,
-        interval=receiver.aggregator.interval,
+        type="derive", plugin=receiver.plugin, time=timestamp
     )
 
     for (
         hostname,
         progname,
         stats,
-    ) in receiver.aggregator.get_stats_by_progname(type_.name, timestamp, sum):
-        print("Summarize totals by progname: %s" % stats)
+    ) in receiver.aggregator.get_stats_by_progname(type_.name, timestamp):
+        #        print("Summarize totals by progname: %s" % stats)
         for name, value in zip(type_.names, stats.values):
             values.dispatch(
+                interval=stats.interval,
                 host=hostname,
                 plugin_instance=progname,
                 type_instance=name,
@@ -88,11 +85,12 @@ def _summarize_totals(receiver, type_, timestamp):
             )
 
     for hostname, stats in receiver.aggregator.get_stats_by_hostname(
-        type_.name, timestamp, sum
+        type_.name, timestamp
     ):
-        print("Summarize totals by hostname: %s" % stats)
+        #        print("Summarize totals by hostname: %s" % stats)
         for name, value in zip(type_.names, stats.values):
             values.dispatch(
+                interval=stats.interval,
                 host=hostname,
                 plugin_instance="host",
                 type_instance=name,
