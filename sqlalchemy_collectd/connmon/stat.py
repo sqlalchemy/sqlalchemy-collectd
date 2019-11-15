@@ -1,8 +1,8 @@
 import threading
 import time
 
-from ..client.internal_types import pool
-from ..client.internal_types import totals
+from ..types import pool
+from ..types import totals
 
 
 class HostProg(object):

@@ -143,6 +143,34 @@ class Values(object):
         d.update(kw)
         return Values(**d)
 
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __add__(self, other):
+        if not isinstance(other, Values):
+            other_values = [other for v in self.values]
+            _reverse_coalesce = {}
+        else:
+            other_values = other.values
+            _reverse_coalesce = {
+                k: None
+                for k in [
+                    "type_instance",
+                    "host",
+                    "time",
+                    "interval",
+                    "plugin_instance",
+                    "plugin",
+                    "type",
+                ]
+                if getattr(self, k) != getattr(other, k)
+            }
+
+        return self.build(
+            values=[v + o for v, o in zip(self.values, other_values)],
+            **_reverse_coalesce
+        )
+
     def __eq__(self, other):
         if not isinstance(other, Values):
             return False

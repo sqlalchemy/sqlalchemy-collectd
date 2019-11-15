@@ -20,9 +20,14 @@ class Aggregator(object):
             name: TimeBucket(4, self.interval) for name in self.bucket_names
         }
 
-    def set_stats(
-        self, bucket_name, hostname, progname, pid, timestamp, values, interval
-    ):
+    def set_stats(self, values):
+        bucket_name = values.type
+        timestamp = values.time
+        hostname = values.host
+        progname = values.plugin_instance
+        pid = values.type_instance
+        interval = values.interval
+
         if not self.interval:
             self._init_buckets(interval)
 
@@ -37,7 +42,7 @@ class Aggregator(object):
             sorted(records), key=lambda rec: (rec[0], rec[1])
         ):
             recs = [records[key] for key in keys]
-            yield (hostname, progname, [agg_func(coll) for coll in zip(*recs)])
+            yield (hostname, progname, agg_func(recs))
 
     def get_stats_by_hostname(self, bucket_name, timestamp, agg_func):
         bucket = self.buckets[bucket_name]
@@ -46,7 +51,7 @@ class Aggregator(object):
             sorted(records), key=lambda rec: rec[0]
         ):
             recs = [records[key] for key in keys]
-            yield hostname, [agg_func(coll) for coll in zip(*recs)]
+            yield hostname, agg_func(recs)
 
 
 class TimeBucket(object):

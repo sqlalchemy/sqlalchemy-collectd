@@ -3,7 +3,7 @@ import logging
 import collectd
 
 from .. import protocol
-from ..client import internal_types
+from .. import types as internal_types
 from ..server import aggregator
 from ..server.logging import CollectdHandler
 from ..server.receiver import COLLECTD_PLUGIN_NAME
