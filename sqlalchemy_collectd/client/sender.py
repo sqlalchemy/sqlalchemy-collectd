@@ -48,7 +48,6 @@ def _send_pool(values, collection_target):
             collection_target.num_detached,
             # collection_target.num_invalidated,
             collection_target.num_connections,
-            collection_target.num_processes,
         ],
     )
 

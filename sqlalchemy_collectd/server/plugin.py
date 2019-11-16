@@ -6,7 +6,6 @@ import collectd
 from . import listener
 from . import monitor
 from . import receiver
-from . import summarizer
 from .logging import CollectdHandler
 from .. import protocol
 
@@ -60,7 +59,7 @@ def start_plugin(config):
 
 def read(data=None):
     now = time.time()
-    summarizer.summarize(collectd, receiver_, now)
+    receiver_.summarize(collectd, now)
 
 
 collectd.register_config(get_config)

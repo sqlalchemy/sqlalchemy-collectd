@@ -19,7 +19,7 @@ class TimeBucketTest(unittest.TestCase):
 
     def test_put(self):
         agg = stream.TimeBucket(4)
-        interval = 5
+        interval = 10
         agg.put(50530, interval, "key", "value_50530")
 
         self.assertEqual(agg.get(50532, "key"), "value_50530")
@@ -62,7 +62,7 @@ class TimeBucketTest(unittest.TestCase):
         previous_time = None
         for round_, time in enumerate(self._generate(10)):
             if round_ % 4 == 1:
-                value = agg.get(time, "key", interval=5)
+                value = agg.get(time, "key", interval=10)
                 if value is None:
                     assert previous_time // 10 != time // 10
                 else:
@@ -77,5 +77,5 @@ class TimeBucketTest(unittest.TestCase):
                         value,
                     )
             else:
-                agg.put(time, 5, "key", "value_%s" % time)
+                agg.put(time, 10, "key", "value_%s" % time)
             previous_time = time

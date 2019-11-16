@@ -144,7 +144,7 @@ class TimeBucket(object):
                     )
         assert self.interval is not None
         timestamp = int(timestamp)
-        slot = timestamp // (self.interval * 2)
+        slot = timestamp // self.interval
         bucket_num = slot % self.num_buckets
         bucket = self.buckets[bucket_num]
         bucket_slot = bucket["slot"]

@@ -15,7 +15,12 @@ pool_internal = protocol.Type(
     ("detached", protocol.VALUE_GAUGE),
     # ("invalidated", protocol.VALUE_GAUGE),
     ("connections", protocol.VALUE_GAUGE),
-    ("numprocs", protocol.VALUE_GAUGE),
+)
+
+# numprocs is not passed by the client, it's calculated by the
+# server-side aggregator
+process_internal = protocol.Type(
+    "sqlalchemy_process", ("numprocs", protocol.VALUE_GAUGE)
 )
 
 # these values are passed as aggregate totals, and continue to grow.

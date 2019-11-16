@@ -51,13 +51,16 @@ class CollectDProtocolTest(unittest.TestCase):
             type_instance="sometypeinstance",
         )
 
-        assert sum(
-            [
-                value.build(values=[5, 10]),
-                value.build(values=[25, 8]),
-                value.build(values=[11, 7]),
-            ]
-        ) == value.build(values=[41, 25])
+        self.assertEqual(
+            sum(
+                [
+                    value.build(values=[5, 10]),
+                    value.build(values=[25, 8]),
+                    value.build(values=[11, 7]),
+                ]
+            ),
+            value.build(values=[41, 25]),
+        )
 
         # other fields that are different are removed
         self.assertEqual(
@@ -71,7 +74,7 @@ class CollectDProtocolTest(unittest.TestCase):
             value.build(type_instance=None, values=[41, 25]),
         )
 
-    def test_value_build(self):
+    def test_values_build(self):
         value = protocol.Values(
             type="my_type",
             host="somehost",

@@ -85,10 +85,6 @@ class CollectionTarget(object):
     def num_transactions(self):
         return len(self.transactions)
 
-    @property
-    def num_processes(self):
-        return 1
-
 
 class EngineCollector(object):
     def __init__(self, collection_target, engine):

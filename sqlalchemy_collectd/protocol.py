@@ -151,6 +151,8 @@ class Values(object):
         return self.__add__(other)
 
     def __add__(self, other):
+        """Sum the data values of this Values against another."""
+
         if not isinstance(other, Values):
             other_values = [other for v in self.values]
             _reverse_coalesce = {}
