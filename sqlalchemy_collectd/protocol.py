@@ -135,8 +135,12 @@ class Values(object):
         if self.interval is None:
             self.interval = DEFAULT_INTERVAL
 
-    def _asdict(self):
-        return {k: getattr(self, k) for k in self.__slots__}
+    def _asdict(self, omit_none=False):
+        return {
+            k: getattr(self, k)
+            for k in self.__slots__
+            if not omit_none or getattr(self, k) is not None
+        }
 
     def build(self, **kw):
         d = self._asdict()
@@ -178,6 +182,11 @@ class Values(object):
         return [getattr(self, k) for k in self.__slots__] == [
             getattr(other, k) for k in self.__slots__
         ]
+
+    def send_to_collectd(self, collectd):
+        v = collectd.Values(**self._asdict(omit_none=True))
+        log.debug("dispatch to collectd server: %r", v)
+        v.dispatch()
 
     def __repr__(self):
         return "sqlalchemy_collectd.Values(%s)" % (
@@ -263,7 +272,8 @@ class MessageReceiver(object):
             value = self._to_value(result)
             return value
         finally:
-            log.debug("receive: %s", value)
+            pass
+            # log.debug("receive: %s", value)
 
     def _to_value(self, result):
         return Values(

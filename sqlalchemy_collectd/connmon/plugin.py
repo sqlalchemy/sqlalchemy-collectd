@@ -2,8 +2,8 @@ import logging
 
 import collectd
 
+from .. import internal_types
 from .. import protocol
-from .. import types as internal_types
 from ..server import aggregator
 from ..server.logging import CollectdHandler
 from ..server.receiver import COLLECTD_PLUGIN_NAME

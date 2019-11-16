@@ -1,8 +1,7 @@
 import threading
 import time
 
-from ..types import pool
-from ..types import totals
+from .. import internal_types
 
 
 class HostProg(object):
@@ -39,20 +38,28 @@ class HostProg(object):
         self.checkouts_per_second = 0.0
 
     def update_pool_stats(self, stats):
-        self.checkout_count = stats[pool.get_stat_index("checkedout")]
+        self.checkout_count = stats[
+            internal_types.pool.get_stat_index("checkedout")
+        ]
         self.max_checkedout = max(self.max_checkedout, self.checkout_count)
 
-        self.connection_count = stats[pool.get_stat_index("connections")]
+        self.connection_count = stats[
+            internal_types.pool.get_stat_index("connections")
+        ]
         self.max_connections = max(self.max_connections, self.connection_count)
 
-        self.process_count = stats[pool.get_stat_index("numprocs")]
+        self.process_count = stats[
+            internal_types.pool.get_stat_index("numprocs")
+        ]
         self.max_process_count = max(
             self.process_count, self.max_process_count
         )
 
     def update_total_stats(self, interval, timestamp, stats):
 
-        total_checkouts = stats[totals.get_stat_index("checkouts")]
+        total_checkouts = stats[
+            internal_types.totals.get_stat_index("checkouts")
+        ]
         if self.total_checkouts == -1:
             self.total_checkouts = total_checkouts
 

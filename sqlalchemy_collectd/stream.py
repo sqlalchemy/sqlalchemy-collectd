@@ -2,6 +2,22 @@ from . import protocol
 
 
 class StreamTranslator(object):
+    """Translates Value objects between internal types and "external"
+    types.
+
+    The "external" types are the simple types that are in collectd
+    types.db, where we are looking at the "derive" type, which is a mapping
+    to a single protocol.VALUE_DERIVE value, and the "count" type, which is
+    a mapping to a zero-bounded protocol.VALUE_GAUGE type.  There is also
+    a "gauge" type however we are working with zero-bounded ranges.
+
+    We use these pre-defined types because SQLAlchemy-collectd does not
+    have an entry in the collectd types.db file and collectd doesn't give us
+    a straightforward way to extend on these types.
+
+
+    """
+
     def __init__(self, *internal_types):
         self.internal_types = internal_types
 
@@ -9,7 +25,7 @@ class StreamTranslator(object):
         self.external_types = {}
         self.external_type_to_internal = {}
         self._protocol_type_string_names = {
-            protocol.VALUE_GAUGE: "gauge",
+            protocol.VALUE_GAUGE: "count",
             protocol.VALUE_DERIVE: "derive",
         }
 
@@ -22,18 +38,17 @@ class StreamTranslator(object):
                 ] = external_type = protocol.Type(name, ("value", value_type))
                 self.external_type_to_internal[external_type] = internal_type
 
-    def break_into_individual_values(self, list_of_values):
-        for value in list_of_values:
-            internal_type = self._type_by_name[value.type]
-            for name, protocol_type, value_element in zip(
-                internal_type.names, internal_type.types, value.values
-            ):
-                external_type = self.external_types[name]
-                yield value.build(
-                    type_instance=external_type.name,
-                    type=self._protocol_type_string_names[protocol_type],
-                    values=[value_element],
-                )
+    def break_into_individual_values(self, values_obj):
+        internal_type = self._type_by_name[values_obj.type]
+        for name, protocol_type, value_element in zip(
+            internal_type.names, internal_type.types, values_obj.values
+        ):
+            external_type = self.external_types[name]
+            yield values_obj.build(
+                type_instance=external_type.name,
+                type=self._protocol_type_string_names[protocol_type],
+                values=[value_element],
+            )
 
     def combine_into_grouped_values(self, consumer_fn):
         return ValueAggregator(self, consumer_fn)

@@ -35,7 +35,7 @@ class BreakIntoValuesTest(unittest.TestCase):
 
         return [
             value.build(
-                time=50, type="gauge", type_instance="some_val", values=[5]
+                time=50, type="count", type_instance="some_val", values=[5]
             ),
             value.build(
                 time=50,
@@ -50,7 +50,7 @@ class BreakIntoValuesTest(unittest.TestCase):
                 values=[15],
             ),
             value.build(
-                time=55, type="gauge", type_instance="some_val", values=[25]
+                time=55, type="count", type_instance="some_val", values=[25]
             ),
             value.build(
                 time=55,
@@ -65,7 +65,7 @@ class BreakIntoValuesTest(unittest.TestCase):
                 values=[9],
             ),
             value.build(
-                time=60, type="gauge", type_instance="some_val", values=[11]
+                time=60, type="count", type_instance="some_val", values=[11]
             ),
             value.build(
                 time=60,
@@ -91,14 +91,11 @@ class BreakIntoValuesTest(unittest.TestCase):
         )
 
         data = self._internal_stream()
-        self.assertEqual(
-            list(
-                stream.StreamTranslator(type_).break_into_individual_values(
-                    data
-                )
-            ),
-            self._external_stream(),
-        )
+        translator = stream.StreamTranslator(type_)
+        l = []
+        for v in data:
+            l.extend(translator.break_into_individual_values(v))
+        self.assertEqual(l, self._external_stream())
 
     def test_combine_by_time(self):
         type_ = protocol.Type(

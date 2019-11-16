@@ -60,13 +60,52 @@ class CollectDProtocolTest(unittest.TestCase):
         ) == value.build(values=[41, 25])
 
         # other fields that are different are removed
-        assert sum(
-            [
-                value.build(type_instance="one", values=[5, 10]),
-                value.build(type_instance="two", values=[25, 8]),
-                value.build(values=[11, 7]),
-            ]
-        ) == value.build(type_instance=None, values=[41, 25])
+        self.assertEqual(
+            sum(
+                [
+                    value.build(type_instance="one", values=[5, 10]),
+                    value.build(type_instance="two", values=[25, 8]),
+                    value.build(values=[11, 7]),
+                ]
+            ),
+            value.build(type_instance=None, values=[41, 25]),
+        )
+
+    def test_value_build(self):
+        value = protocol.Values(
+            type="my_type",
+            host="somehost",
+            plugin="someplugin",
+            plugin_instance="someplugininstance",
+            type_instance="sometypeinstance",
+            time=50,
+        )
+
+        v1 = value.build(time=60)
+        v2 = value.build(time=70)
+
+        self.assertEqual(
+            value,
+            protocol.Values(
+                type="my_type",
+                host="somehost",
+                plugin="someplugin",
+                plugin_instance="someplugininstance",
+                type_instance="sometypeinstance",
+                time=50,
+            ),
+        )
+        self.assertEqual(
+            v2,
+            protocol.Values(
+                type="my_type",
+                host="somehost",
+                plugin="someplugin",
+                plugin_instance="someplugininstance",
+                type_instance="sometypeinstance",
+                time=70,
+            ),
+        )
 
     def test_message_construct(self):
         type_ = protocol.Type(

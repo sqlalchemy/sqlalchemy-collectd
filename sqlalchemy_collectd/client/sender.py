@@ -1,5 +1,5 @@
+from .. import internal_types
 from .. import protocol
-from .. import types as internal_types
 
 
 senders = []

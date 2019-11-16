@@ -60,7 +60,7 @@ def start_plugin(config):
 
 def read(data=None):
     now = time.time()
-    summarizer.summarize(receiver_, now)
+    summarizer.summarize(collectd, receiver_, now)
 
 
 collectd.register_config(get_config)
