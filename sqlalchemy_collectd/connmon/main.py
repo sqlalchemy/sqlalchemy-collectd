@@ -24,7 +24,7 @@ def main(argv=[]):
     )
     options = parser.parse_args(argv)
 
-    receiver_ = receiver.Receiver()
+    receiver_ = receiver.Receiver(include_pids=False)
 
     connection = protocol.ServerConnection(options.host, options.port)
 
@@ -33,8 +33,20 @@ def main(argv=[]):
     stat_ = stat.Stat(receiver_.aggregator)
     stat_.start()
 
+    # _dummy_wait()
     display_ = display.Display(stat_, connection)
     display_.start()
+
+
+def _dummy_wait():
+    import time
+    import logging
+
+    logging.basicConfig()
+    logging.getLogger("sqlalchemy_collectd.protocol").setLevel(logging.DEBUG)
+
+    while True:
+        time.sleep(5)
 
 
 if __name__ == "__main__":

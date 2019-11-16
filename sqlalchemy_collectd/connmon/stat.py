@@ -37,28 +37,29 @@ class HostProg(object):
         self.process_count = self.connection_count = self.checkout_count = 0
         self.checkouts_per_second = 0.0
 
-    def update_pool_stats(self, stats):
-        self.checkout_count = stats[
-            internal_types.pool.get_stat_index("checkedout")
-        ]
-        self.max_checkedout = max(self.max_checkedout, self.checkout_count)
-
-        self.connection_count = stats[
-            internal_types.pool.get_stat_index("connections")
-        ]
-        self.max_connections = max(self.max_connections, self.connection_count)
-
-        self.process_count = stats[
-            internal_types.pool.get_stat_index("numprocs")
+    def update_process_stats(self, stats):
+        self.process_count = stats.values[
+            internal_types.process_internal.get_stat_index("numprocs")
         ]
         self.max_process_count = max(
             self.process_count, self.max_process_count
         )
 
+    def update_pool_stats(self, stats):
+        self.checkout_count = stats.values[
+            internal_types.pool_internal.get_stat_index("checkedout")
+        ]
+        self.max_checkedout = max(self.max_checkedout, self.checkout_count)
+
+        self.connection_count = stats.values[
+            internal_types.pool_internal.get_stat_index("connections")
+        ]
+        self.max_connections = max(self.max_connections, self.connection_count)
+
     def update_total_stats(self, interval, timestamp, stats):
 
-        total_checkouts = stats[
-            internal_types.totals.get_stat_index("checkouts")
+        total_checkouts = stats.values[
+            internal_types.totals_internal.get_stat_index("checkouts")
         ]
         if self.total_checkouts == -1:
             self.total_checkouts = total_checkouts
@@ -117,46 +118,57 @@ class Stat(object):
             now = time.time()
             timestamp = now  # - (self.aggregator.interval / 5)
             hostprogs_seen = set()
+            interval = None
 
-            for (
-                hostname,
-                progname,
-                stats,
-            ) in self.aggregator.get_stats_by_progname(
+            for values_obj in self.aggregator.get_stats_by_progname(
                 "sqlalchemy_totals", timestamp
             ):
+                hostname = values_obj.host
+                progname = values_obj.plugin_instance
+                interval = values_obj.interval
+
                 hostprog = self._get_hostprog(
                     hostname, progname, hostprogs_seen
                 )
-                hostprog.update_total_stats(
-                    self.aggregator.interval, timestamp, stats
-                )
+                hostprog.update_total_stats(interval, timestamp, values_obj)
 
-            for (
-                hostname,
-                progname,
-                stats,
-            ) in self.aggregator.get_stats_by_progname(
+            for values_obj in self.aggregator.get_stats_by_progname(
                 "sqlalchemy_pool", timestamp
             ):
+                hostname = values_obj.host
+                progname = values_obj.plugin_instance
+
                 hostprog = self._get_hostprog(
                     hostname, progname, hostprogs_seen
                 )
 
-                hostprog.update_pool_stats(stats)
+                hostprog.update_pool_stats(values_obj)
 
-            for hostprog in list(self.hostprogs.values()):
-                if (
-                    hostprog.hostname,
-                    hostprog.progname,
-                ) not in hostprogs_seen:
-                    age = now - hostprog.last_time
-                    if age > self.aggregator.interval * 5:
-                        del self.hostprogs[
-                            (hostprog.hostname, hostprog.progname)
-                        ]
-                    elif age > self.aggregator.interval:
-                        hostprog.kill_processes()
+            for values_obj in self.aggregator.get_stats_by_progname(
+                "sqlalchemy_process", timestamp
+            ):
+                hostname = values_obj.host
+                progname = values_obj.plugin_instance
+
+                hostprog = self._get_hostprog(
+                    hostname, progname, hostprogs_seen
+                )
+
+                hostprog.update_process_stats(values_obj)
+
+            if interval is not None:
+                for hostprog in list(self.hostprogs.values()):
+                    if (
+                        hostprog.hostname,
+                        hostprog.progname,
+                    ) not in hostprogs_seen:
+                        age = now - hostprog.last_time
+                        if age > interval * 5:
+                            del self.hostprogs[
+                                (hostprog.hostname, hostprog.progname)
+                            ]
+                        elif age > interval:
+                            hostprog.kill_processes()
 
             self.update_host_stats()
 

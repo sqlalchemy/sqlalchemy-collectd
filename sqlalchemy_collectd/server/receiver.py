@@ -11,7 +11,7 @@ COLLECTD_PLUGIN_NAME = "sqlalchemy"
 
 
 class Receiver(object):
-    def __init__(self, plugin=COLLECTD_PLUGIN_NAME):
+    def __init__(self, plugin=COLLECTD_PLUGIN_NAME, include_pids=True):
         self.plugin = plugin
         self.internal_types = [
             internal_types.pool_internal,
@@ -22,15 +22,11 @@ class Receiver(object):
         self.translator = stream.StreamTranslator(*self.internal_types)
 
         self.aggregator = aggregator.Aggregator(
-            [t.name for t in self.internal_types]
+            [t.name for t in self.internal_types], include_pids=include_pids
         )
-
-        self.monitors = []
 
     def receive(self, connection):
         data, host_ = connection.receive()
-        for monitor in self.monitors:
-            monitor.forward(data)
 
         values_obj = self.message_receiver.receive(connection, data)
         self.aggregator.set_stats(values_obj)
