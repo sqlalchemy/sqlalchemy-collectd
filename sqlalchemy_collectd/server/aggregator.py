@@ -46,7 +46,7 @@ class Aggregator(object):
             values_obj = agg_func(recs).build(
                 time=timestamp, interval=bucket.interval
             )
-            yield (hostname, progname, values_obj)
+            yield values_obj
 
     def get_stats_by_hostname(self, bucket_name, timestamp, agg_func=sum):
         bucket = self.buckets[bucket_name]
@@ -60,4 +60,4 @@ class Aggregator(object):
                 time=timestamp,
                 interval=bucket.interval,
             )
-            yield hostname, values_obj
+            yield values_obj

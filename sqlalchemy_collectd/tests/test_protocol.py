@@ -143,8 +143,9 @@ class CollectDProtocolTest(unittest.TestCase):
             ("some_other_val", protocol.VALUE_DERIVE),
         )
 
+        connection = mock.Mock()
         message_receiver = protocol.MessageReceiver(type_)
-        result = message_receiver.receive(self.message)
+        result = message_receiver.receive(connection, self.message)
         self.assertEqual(
             protocol.Values(
                 type="my_type",

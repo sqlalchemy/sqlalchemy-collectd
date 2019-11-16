@@ -4,7 +4,6 @@ import time
 import collectd
 
 from . import listener
-from . import monitor
 from . import receiver
 from .logging import CollectdHandler
 from .. import protocol
@@ -41,18 +40,6 @@ def start_plugin(config):
         "sqlalchemy.collectd server listening for "
         "SQLAlchemy clients on UDP %s %d" % (host, port)
     )
-
-    if monitor_host is not None and monitor_port is not None:
-        # this use is deprecated; a separate connmon plugin should be set up
-        receiver_.monitors.append(
-            monitor.Monitor(monitor_host, int(monitor_port))
-        )
-        log.info(
-            "sqlalchemy.collectd forwarding local SQLAlchemy "
-            "messages to connmon clients on %s %d",
-            monitor_host,
-            monitor_port,
-        )
 
     listener.listen(connection, receiver_)
 

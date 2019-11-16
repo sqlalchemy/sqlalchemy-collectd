@@ -59,28 +59,40 @@ class ValueAggregator(object):
         self.stream_translator = stream_translator
         self.consumer_fn = consumer_fn
         self.time_bucket = TimeBucket(4)
+        self.buckets = {
+            type_.name: TimeBucket(4)
+            for type_ in stream_translator.internal_types
+        }
 
-    def put_values(self, values):
+    def put_values(self, values_obj):
         external_type = self.stream_translator.external_types[
-            values.type_instance
+            values_obj.type_instance
         ]
         internal_type = self.stream_translator.external_type_to_internal[
             external_type
         ]
-        key = (internal_type.name, external_type.name)
-        bucket_data = self.time_bucket.put(
-            values.time, values.interval, key, values
-        )
-        if len(bucket_data) == len(internal_type.names):
-            aggregated_value = sum(bucket_data.values())
+        bucket = self.buckets[internal_type.name]
+        bucket_data = bucket.get_data(values_obj.time, values_obj.interval * 4)
+
+        key = (values_obj.plugin_instance,)
+        if key not in bucket_data:
+            bucket_data[key] = per_instance_bucket = {}
+        else:
+            per_instance_bucket = bucket_data[key]
+
+        external_name = external_type.name
+        per_instance_bucket[external_name] = values_obj
+        if len(per_instance_bucket) == len(internal_type.names):
+            aggregated_value = sum(per_instance_bucket.values())
             aggregated_value = aggregated_value.build(
                 type=internal_type.name,
+                type_instance=None,
                 values=[
-                    bucket_data[(internal_type.name, external_name)].values[0]
+                    per_instance_bucket[external_name].values[0]
                     for external_name in internal_type.names
                 ],
             )
-            bucket_data.clear()
+            del bucket_data[key]
             self.consumer_fn(aggregated_value)
 
 
@@ -144,7 +156,7 @@ class TimeBucket(object):
                     )
         assert self.interval is not None
         timestamp = int(timestamp)
-        slot = timestamp // self.interval
+        slot = int(timestamp // self.interval)
         bucket_num = slot % self.num_buckets
         bucket = self.buckets[bucket_num]
         bucket_slot = bucket["slot"]

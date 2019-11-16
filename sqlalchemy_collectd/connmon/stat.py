@@ -111,11 +111,11 @@ class Stat(object):
     def _update(self):
         while True:
             time.sleep(1)
-            if self.aggregator.interval is None:
+            if not self.aggregator.ready:
                 continue
 
             now = time.time()
-            timestamp = now - (self.aggregator.interval / 5)
+            timestamp = now  # - (self.aggregator.interval / 5)
             hostprogs_seen = set()
 
             for (

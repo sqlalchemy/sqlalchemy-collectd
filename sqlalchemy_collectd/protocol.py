@@ -185,6 +185,19 @@ class Values(object):
             getattr(other, k) for k in self.__slots__
         ]
 
+    @classmethod
+    def from_collectd_values(cls, cd_values_obj):
+        return cls(
+            type=cd_values_obj.type,
+            type_instance=cd_values_obj.type_instance,
+            plugin=cd_values_obj.plugin,
+            plugin_instance=cd_values_obj.plugin_instance,
+            host=cd_values_obj.host,
+            time=cd_values_obj.time,
+            interval=cd_values_obj.interval,
+            values=cd_values_obj.values,
+        )
+
     def send_to_collectd(self, collectd):
         v = collectd.Values(**self._asdict(omit_none=True))
         log.debug("dispatch to collectd server: %r", v)
@@ -220,7 +233,7 @@ class MessageSender(object):
             _pack_string(TYPE_PLUGIN, values_obj.plugin)
             + _pack_string(TYPE_PLUGIN_INSTANCE, values_obj.plugin_instance)
             + _pack_string(TYPE_TYPE, type_obj.name)
-            + struct.pack("!HHq", TYPE_INTERVAL, 12, values_obj.interval)
+            + struct.pack("!HHq", TYPE_INTERVAL, 12, int(values_obj.interval))
             + _pack_string(TYPE_TYPE_INSTANCE, values_obj.type_instance)
         )
         header_ = (
@@ -232,10 +245,16 @@ class MessageSender(object):
 
         payload = type_obj._encode_values(*values_obj.values)
 
-        log.debug("send: %s", values_obj)
+        log.debug(
+            "send[UDP:%s:%s] -> %s",
+            connection.host,
+            connection.port,
+            values_obj,
+        )
         connection.send(header_ + payload)
 
     def _pack_string(self, typecode, value):
+        value = value or ""
         return (
             header.pack(typecode, 5 + len(value))
             + value.encode("ascii")
@@ -257,7 +276,7 @@ class MessageReceiver(object):
         }
         self._types = {type_.name: type_ for type_ in types}
 
-    def receive(self, buf):
+    def receive(self, connection, buf):
         result = self._unpack_packet(buf)
         try:
             type_name = result[TYPE_TYPE]
@@ -274,8 +293,12 @@ class MessageReceiver(object):
             value = self._to_value(result)
             return value
         finally:
-            pass
-            # log.debug("receive: %s", value)
+            log.debug(
+                "receive[UDP:%s:%s] -> %s",
+                connection.host,
+                connection.port,
+                value,
+            )
 
     def _to_value(self, result):
         return Values(
