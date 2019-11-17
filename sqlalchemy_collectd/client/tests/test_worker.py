@@ -13,12 +13,12 @@ class WorkerTest(unittest.TestCase):
         collection_one = ["one", KeyError("random internal error"), "three"]
         collection_two = ["one", "two", SystemExit()]
 
-        def send(collection, collection_target, now, interval, pid):
+        def send(collection, now, interval, pid):
             obj = collection.pop(0)
             if isinstance(obj, BaseException):
                 raise obj
             else:
-                canary.send(collection_target, obj)
+                canary.send(obj)
 
         the_time = [100]
 
@@ -47,15 +47,11 @@ class WorkerTest(unittest.TestCase):
                 # this adds the target and also starts the worker thread.
                 # however we have it blocked from doing anything via the
                 # mutex above...
-                worker.add_target(
-                    collection_one, "target one", mock.Mock(send=send)
-                )
+                worker.add_target(collection_one, mock.Mock(send=send))
 
                 # ...so that we can also add this target and get deterministic
                 # results
-                worker.add_target(
-                    collection_two, "target two", mock.Mock(send=send)
-                )
+                worker.add_target(collection_two, mock.Mock(send=send))
             finally:
                 # worker thread is unblocked
                 mutex.release()
@@ -67,10 +63,10 @@ class WorkerTest(unittest.TestCase):
         # see that it did what we asked.
         self.assertEqual(
             [
-                mock.call.send("target one", "one"),
-                mock.call.send("target two", "one"),
-                mock.call.send("target two", "two"),
-                mock.call.send("target one", "three"),
+                mock.call.send("one"),
+                mock.call.send("one"),
+                mock.call.send("two"),
+                mock.call.send("three"),
             ],
             canary.mock_calls,
         )

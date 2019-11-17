@@ -4,6 +4,8 @@ from . import protocol
 # to talk to the SQLAlchemy collectd plugin.
 
 
+COLLECTD_PLUGIN_NAME = "sqlalchemy"
+
 # these values are the current number of something at a point in time,
 # like current number of connections, number of processes.
 # these numbers go up and down.

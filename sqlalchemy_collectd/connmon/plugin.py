@@ -6,7 +6,6 @@ from .. import internal_types
 from .. import protocol
 from .. import stream
 from ..server.logging import CollectdHandler
-from ..server.receiver import COLLECTD_PLUGIN_NAME
 
 log = logging.getLogger(__name__)
 
@@ -33,17 +32,13 @@ def start_plugin(config):
         internal_types.process_internal,
     ]
 
-    client_connection = protocol.ClientConnection(
-        monitor_host, int(monitor_port)
+    message_sender = protocol.NetworkSender(
+        protocol.ClientConnection(monitor_host, int(monitor_port), log), types
     )
-    message_sender = protocol.MessageSender(*types)
-
-    def sender(values_obj):
-        message_sender.send(client_connection, values_obj)
 
     values_aggregator = stream.StreamTranslator(
         *types
-    ).combine_into_grouped_values(sender)
+    ).combine_into_grouped_values(message_sender.send)
     log.info(
         "sqlalchemy.collectd forwarding server-wide SQLAlchemy "
         "messages to connmon clients on %s %d",
@@ -63,8 +58,8 @@ def write(cd_values_obj):
 
     """
 
-    if cd_values_obj.plugin == COLLECTD_PLUGIN_NAME:
-        values_obj = protocol.Values.from_collectd_values(cd_values_obj)
+    if cd_values_obj.plugin == internal_types.COLLECTD_PLUGIN_NAME:
+        values_obj = protocol.Values.from_collectd_values(cd_values_obj, log)
         values_aggregator.put_values(values_obj)
 
 

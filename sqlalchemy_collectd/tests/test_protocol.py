@@ -117,8 +117,6 @@ class CollectDProtocolTest(unittest.TestCase):
             ("some_other_val", protocol.VALUE_DERIVE),
         )
 
-        sender = protocol.MessageSender(type_)
-
         value = protocol.Values(
             type="my_type",
             host="somehost",
@@ -129,10 +127,8 @@ class CollectDProtocolTest(unittest.TestCase):
 
         connection = mock.Mock()
 
-        sender.send(
-            connection,
-            value.build(time=1517607042.95968, values=[25.809, 450]),
-        )
+        sender = protocol.NetworkSender(connection, [type_])
+        sender.send(value.build(time=1517607042.95968, values=[25.809, 450]))
 
         self.assertEqual([mock.call(self.message)], connection.send.mock_calls)
 
@@ -143,9 +139,11 @@ class CollectDProtocolTest(unittest.TestCase):
             ("some_other_val", protocol.VALUE_DERIVE),
         )
 
-        connection = mock.Mock()
-        message_receiver = protocol.MessageReceiver(type_)
-        result = message_receiver.receive(connection, self.message)
+        connection = mock.Mock(
+            receive=mock.Mock(return_value=(self.message, "localhost"))
+        )
+        network_receiver = protocol.NetworkReceiver(connection, [type_])
+        result = network_receiver.receive()
         self.assertEqual(
             protocol.Values(
                 type="my_type",
@@ -167,9 +165,16 @@ class CollectDProtocolTest(unittest.TestCase):
             ("some_other_val", protocol.VALUE_DERIVE),
         )
 
-        message_receiver = protocol.MessageReceiver(type_)
-        with mock.patch.object(protocol, "log") as log:
-            result = message_receiver.receive(b"asdfjq34kt2n34kjnas")
+        log = mock.Mock()
+        connection = mock.Mock(
+            receive=mock.Mock(
+                return_value=(b"asdfjq34kt2n34kjnas", "localhost")
+            ),
+            log=log,
+        )
+        network_receiver = protocol.NetworkReceiver(connection, [type_])
+
+        result = network_receiver.receive()
         self.assertEqual(result, None)
         self.assertEqual(
             log.mock_calls,

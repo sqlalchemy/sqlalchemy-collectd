@@ -22,7 +22,7 @@ _TEXT_RE = re.compile(r"(#.+?)&", re.M)
 
 
 class Display(object):
-    def __init__(self, stat, connection):
+    def __init__(self, stat, service_str):
         self.columns = [
             ("hostname (#R&[dis]#G&connected#d&)", "%s", 0.18, "L"),
             ("progname", "%s", 0.20, "R"),
@@ -35,7 +35,7 @@ class Display(object):
             ("ckoutpersec", "%s", 0.08, "R"),
         ]
         self.stat = stat
-        self.connection = connection
+        self.service_str = service_str
 
         self._winsize = None
         self._x_positions = None
@@ -172,10 +172,7 @@ class Display(object):
     def _render(self):
         self.window.erase()
 
-        service_str = "[Direct host: %s:%s]" % (
-            self.connection.host,
-            self.connection.port,
-        )
+        service_str = self.service_str
 
         self._render_str(0, 0, "#Bb&[Connmon]#Dn& %s" % (service_str,))
         self._render_str(0, -1, "#D&Commands: #Y&(Q)#D&uit")

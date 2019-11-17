@@ -1,13 +1,15 @@
 import argparse
+import logging
 
 from . import display
 from . import stat
-from .. import protocol
 from ..server import listener
 from ..server import receiver
 
+log = logging.getLogger(__name__)
 
-def main(argv=[]):
+
+def main(argv=None):
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -24,17 +26,19 @@ def main(argv=[]):
     )
     options = parser.parse_args(argv)
 
-    receiver_ = receiver.Receiver(include_pids=False)
+    receiver_ = receiver.Receiver(
+        options.host, options.port, log, include_pids=False
+    )
 
-    connection = protocol.ServerConnection(options.host, options.port)
-
-    listener.listen(connection, receiver_)
+    listener.listen(receiver_)
 
     stat_ = stat.Stat(receiver_.aggregator)
     stat_.start()
 
+    service_str = "[Direct host: %s:%s]" % (options.host, options.port)
+
     # _dummy_wait()
-    display_ = display.Display(stat_, connection)
+    display_ = display.Display(stat_, service_str)
     display_.start()
 
 
@@ -43,7 +47,7 @@ def _dummy_wait():
     import logging
 
     logging.basicConfig()
-    logging.getLogger("sqlalchemy_collectd.protocol").setLevel(logging.DEBUG)
+    log.setLevel(logging.DEBUG)
 
     while True:
         time.sleep(5)

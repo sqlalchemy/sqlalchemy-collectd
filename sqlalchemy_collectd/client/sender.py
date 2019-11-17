@@ -14,15 +14,26 @@ def sends(protocol_type):
 
 
 class Sender(object):
-    def __init__(self, hostname, stats_name, plugin="sqlalchemy"):
+    def __init__(
+        self,
+        hostname,
+        stats_name,
+        collectd_host,
+        collectd_port,
+        log,
+        plugin=internal_types.COLLECTD_PLUGIN_NAME,
+    ):
         self.hostname = hostname
         self.stats_name = stats_name
         self.plugin = plugin
-        self.message_sender = protocol.MessageSender(
-            *[protocol_type for protocol_type, sender in senders]
+        self.message_sender = protocol.NetworkSender(
+            protocol.ClientConnection.for_host_port(
+                collectd_host, collectd_port, log
+            ),
+            [protocol_type for protocol_type, sender in senders],
         )
 
-    def send(self, connection, collection_target, timestamp, interval, pid):
+    def send(self, collection_target, timestamp, interval, pid):
         values = protocol.Values(
             host=self.hostname,
             plugin=self.plugin,
@@ -32,9 +43,7 @@ class Sender(object):
             time=timestamp,
         )
         for protocol_type, sender in senders:
-            self.message_sender.send(
-                connection, sender(values, collection_target)
-            )
+            self.message_sender.send(sender(values, collection_target))
 
 
 @sends(internal_types.pool_internal)

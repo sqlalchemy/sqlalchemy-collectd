@@ -2,13 +2,10 @@
 connect straight to the network plugin.
 
 """
-import logging
 import os
 import socket
 import struct
 import threading
-
-log = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL = 10
 MAX_PACKET_SIZE = 1024
@@ -186,7 +183,9 @@ class Values(object):
         ]
 
     @classmethod
-    def from_collectd_values(cls, cd_values_obj):
+    def from_collectd_values(cls, cd_values_obj, log):
+        log.debug("receive[collectd process] -> %r", cd_values_obj)
+
         return cls(
             type=cd_values_obj.type,
             type_instance=cd_values_obj.type_instance,
@@ -198,9 +197,9 @@ class Values(object):
             values=cd_values_obj.values,
         )
 
-    def send_to_collectd(self, collectd):
+    def send_to_collectd(self, collectd, log):
         v = collectd.Values(**self._asdict(omit_none=True))
-        log.debug("dispatch to collectd server: %r", v)
+        log.debug("send[collectd process] -> %r", v)
         v.dispatch()
 
     def __repr__(self):
@@ -208,17 +207,16 @@ class Values(object):
             ", ".join("%s=%r" % (k, getattr(self, k)) for k in self.__slots__),
         )
 
-    # TODO: conversion to and from collectd.values
-    # dispatch method
-    # etc
 
-
-class MessageSender(object):
-    def __init__(self, *types):
+class NetworkSender(object):
+    def __init__(self, connection, types):
         self._types = {type_.name: type_ for type_ in types}
         self._senders = {}
+        self.connection = connection
+        self.log = connection.log
 
-    def send(self, connection, values_obj):
+    def send(self, values_obj):
+        connection = self.connection
         timestamp = values_obj.time
         type_name = values_obj.type
 
@@ -245,7 +243,7 @@ class MessageSender(object):
 
         payload = type_obj._encode_values(*values_obj.values)
 
-        log.debug(
+        self.log.debug(
             "send[UDP:%s:%s] -> %s",
             connection.host,
             connection.port,
@@ -262,8 +260,9 @@ class MessageSender(object):
         )
 
 
-class MessageReceiver(object):
-    def __init__(self, *types):
+class NetworkReceiver(object):
+    def __init__(self, connection, types):
+        self.connection = connection
         self._receivers = {
             TYPE_HOST: self._unpack_string,
             TYPE_TIME: self._unpack_long,
@@ -275,25 +274,28 @@ class MessageReceiver(object):
             TYPE_INTERVAL: self._unpack_long,
         }
         self._types = {type_.name: type_ for type_ in types}
+        self.log = connection.log
 
-    def receive(self, connection, buf):
+    def receive(self):
+        connection = self.connection
+        buf, host_ = connection.receive()
         result = self._unpack_packet(buf)
         try:
             type_name = result[TYPE_TYPE]
         except KeyError:
-            log.warn("Message did not have TYPE_TYPE block, skipping")
+            self.log.warn("Message did not have TYPE_TYPE block, skipping")
             return None
 
         try:
             self._types[type_name]
         except KeyError:
-            log.warn("Type %s not known, skipping", type_name)
+            self.log.warn("Type %s not known, skipping", type_name)
             return None
         else:
             value = self._to_value(result)
             return value
         finally:
-            log.debug(
+            self.log.debug(
                 "receive[UDP:%s:%s] -> %s",
                 connection.host,
                 connection.port,
@@ -322,7 +324,7 @@ class MessageReceiver(object):
             try:
                 fn = self._receivers[type_]
             except KeyError:
-                log.warn("Message %s not known, skipping", type_)
+                self.log.warn("Message %s not known, skipping", type_)
             else:
                 value = fn(type_, len_, buf[pos:])
 
@@ -350,13 +352,27 @@ class MessageReceiver(object):
         return result
 
 
+class ServerConnection(object):
+    def __init__(self, host, port, log):
+        self.host = host
+        self.port = port
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind((host, port))
+        self.log = log
+
+    def receive(self):
+        data, addr = self.sock.recvfrom(1024)
+        return data, addr
+
+
 class ClientConnection(object):
     connections = {}
     create_mutex = threading.Lock()
 
-    def __init__(self, host="localhost", port=25826):
+    def __init__(self, host, port, log):
         self.host = host
         self.port = port
+        self.log = log
         self._mutex = threading.Lock()
         self.socket = None
         self.pid = None
@@ -367,13 +383,13 @@ class ClientConnection(object):
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     @classmethod
-    def for_host_port(cls, host, port):
+    def for_host_port(cls, host, port, log):
         cls.create_mutex.acquire()
         try:
             key = (host, port)
             if key not in cls.connections:
                 cls.connections[key] = connection = ClientConnection(
-                    host, port
+                    host, port, log
                 )
                 return connection
             else:
@@ -386,20 +402,9 @@ class ClientConnection(object):
         self._mutex.acquire()
         try:
             self._check_connect()
+            print("SEND MESSAGE TO %s %s" % (self.host, self.port))
             self.socket.sendto(message, (self.host, self.port))
         except IOError:
-            log.error("Error in socket.sendto", exc_info=True)
+            self.log.error("Error in socket.sendto", exc_info=True)
         finally:
             self._mutex.release()
-
-
-class ServerConnection(object):
-    def __init__(self, host, port):
-        self.host = host
-        self.port = port
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind((host, port))
-
-    def receive(self):
-        data, addr = self.sock.recvfrom(1024)
-        return data, addr

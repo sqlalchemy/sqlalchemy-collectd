@@ -19,7 +19,7 @@ class ListenerTest(unittest.TestCase):
             "five",
         ]
 
-        def receive(connection):
+        def receive():
 
             obj = collection.pop(0)
             if isinstance(obj, BaseException):
@@ -28,7 +28,7 @@ class ListenerTest(unittest.TestCase):
                 canary.receive(obj)
 
         with mock.patch.object(listener, "log") as mock_logger:
-            listener.listen(mock.Mock(), mock.Mock(receive=receive))
+            listener.listen(mock.Mock(receive=receive))
 
         listener.listen_thread.join(1)
 

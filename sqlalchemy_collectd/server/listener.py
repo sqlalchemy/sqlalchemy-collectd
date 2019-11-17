@@ -4,10 +4,10 @@ import threading
 log = logging.getLogger(__name__)
 
 
-def _receive(connection, receiver):
+def _receive(receiver):
     while True:
         try:
-            receiver.receive(connection)
+            receiver.receive()
         except Exception:
             log.error("message receiver caught an exception", exc_info=True)
         except BaseException as be:
@@ -18,10 +18,8 @@ def _receive(connection, receiver):
             break
 
 
-def listen(connection, receiver):
+def listen(receiver):
     global listen_thread
-    listen_thread = threading.Thread(
-        target=_receive, args=(connection, receiver)
-    )
+    listen_thread = threading.Thread(target=_receive, args=(receiver,))
     listen_thread.daemon = True
     listen_thread.start()

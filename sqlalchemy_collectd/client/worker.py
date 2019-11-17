@@ -32,16 +32,13 @@ def _process(interval):
             now = time.time()
             for (
                 collection_target,
-                connection,
                 sender,
                 last_called,
             ) in _collection_targets:
                 if now - last_called[0] > interval:
                     last_called[0] = now
                     try:
-                        sender.send(
-                            connection, collection_target, now, interval, pid
-                        )
+                        sender.send(collection_target, now, interval, pid)
                     except Exception:
                         log.error("error sending stats", exc_info=True)
 
@@ -53,6 +50,6 @@ def _process(interval):
         )
 
 
-def add_target(connection, collection_target, sender):
-    _collection_targets.append((collection_target, connection, sender, [0]))
+def add_target(collection_target, sender):
+    _collection_targets.append((collection_target, sender, [0]))
     _check_threads_started()

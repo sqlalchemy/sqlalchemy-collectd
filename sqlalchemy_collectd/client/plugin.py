@@ -1,3 +1,4 @@
+import logging
 import os
 import socket
 import sys
@@ -7,7 +8,8 @@ from sqlalchemy.engine import CreateEnginePlugin
 from . import collector
 from . import sender
 from . import worker
-from .. import protocol
+
+log = logging.getLogger("sqlalchemy_collectd")
 
 
 class Plugin(CreateEnginePlugin):
@@ -69,14 +71,13 @@ def start_plugin(
     if progname is None:
         progname = os.path.basename(sys.argv[0])
 
-    sender_ = sender.Sender(hostname, progname)
     collection_target = collector.CollectionTarget.collection_for_name(
         progname
     )
     collector.EngineCollector(collection_target, engine)
 
-    connection = protocol.ClientConnection.for_host_port(
-        collectd_host, collectd_port
+    sender_ = sender.Sender(
+        hostname, progname, collectd_host, collectd_port, log
     )
 
-    worker.add_target(connection, collection_target, sender_)
+    worker.add_target(collection_target, sender_)
