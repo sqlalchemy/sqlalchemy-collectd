@@ -32,7 +32,7 @@ def main(argv=None):
 
     listener.listen(receiver_)
 
-    stat_ = stat.Stat(receiver_.aggregator)
+    stat_ = stat.Stat(receiver_)
     stat_.start()
 
     service_str = "[Direct host: %s:%s]" % (options.host, options.port)

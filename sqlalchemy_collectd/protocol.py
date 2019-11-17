@@ -402,7 +402,6 @@ class ClientConnection(object):
         self._mutex.acquire()
         try:
             self._check_connect()
-            print("SEND MESSAGE TO %s %s" % (self.host, self.port))
             self.socket.sendto(message, (self.host, self.port))
         except IOError:
             self.log.error("Error in socket.sendto", exc_info=True)

@@ -177,6 +177,8 @@ class TimeBucket(object):
         return bucket_data
 
     def get(self, current_time, key, interval=None):
+        if interval is None and self.interval is None:
+            return None
         return self._get_bucket(current_time, interval)["data"].get(key)
 
     def get_data(self, current_time, interval=None):

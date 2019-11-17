@@ -81,8 +81,8 @@ class HostProg(object):
 
 
 class Stat(object):
-    def __init__(self, aggregator):
-        self.aggregator = aggregator
+    def __init__(self, receiver):
+        self.receiver = receiver
         self.host_count = 0
         self.max_host_count = 0
         self.process_count = 0
@@ -114,14 +114,12 @@ class Stat(object):
 
         while True:
             time.sleep(1)
-            if not self.aggregator.ready:
-                continue
 
             now = time.time()
             timestamp = now
             hostprogs_seen = set()
 
-            for values_obj in self.aggregator.get_stats_by_progname(
+            for values_obj in self.receiver.get_stats_by_progname(
                 "sqlalchemy_totals", timestamp
             ):
                 hostname = values_obj.host
@@ -141,7 +139,7 @@ class Stat(object):
                 )
                 hostprog.update_total_stats(interval, timestamp, values_obj)
 
-            for values_obj in self.aggregator.get_stats_by_progname(
+            for values_obj in self.receiver.get_stats_by_progname(
                 "sqlalchemy_pool", timestamp
             ):
                 hostname = values_obj.host
@@ -158,7 +156,7 @@ class Stat(object):
 
                 hostprog.update_pool_stats(values_obj)
 
-            for values_obj in self.aggregator.get_stats_by_progname(
+            for values_obj in self.receiver.get_stats_by_progname(
                 "sqlalchemy_process", timestamp
             ):
                 hostname = values_obj.host
