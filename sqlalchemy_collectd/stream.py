@@ -180,4 +180,6 @@ class TimeBucket(object):
         return self._get_bucket(current_time, interval)["data"].get(key)
 
     def get_data(self, current_time, interval=None):
+        if interval is None and self.interval is None:
+            return {}
         return self._get_bucket(current_time, interval)["data"]

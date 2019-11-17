@@ -21,6 +21,9 @@ class Receiver(object):
         self.message_receiver = protocol.MessageReceiver(*self.internal_types)
         self.translator = stream.StreamTranslator(*self.internal_types)
 
+        # TODO: why not have aggreagtor be part of receiver to simplify
+        # things, this becomes a server-specific receiver.  connmon
+        # should have its own receiver
         self.aggregator = aggregator.Aggregator(
             [t.name for t in self.internal_types], include_pids=include_pids
         )

@@ -45,6 +45,14 @@ def start_plugin(config):
 
 
 def read(data=None):
+    """Extract data from received messages periodically and broadcast to
+    the collectd server in which we are embedded.
+
+    The values are sent as "external" types, meaning we are using the
+    "derive" and "count" types in collectd types.db.
+
+    """
+
     now = time.time()
     receiver_.summarize(collectd, now)
 

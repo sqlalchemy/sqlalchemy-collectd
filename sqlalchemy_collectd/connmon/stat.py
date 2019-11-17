@@ -110,21 +110,30 @@ class Stat(object):
         return hostprog
 
     def _update(self):
+        interval = None
+
         while True:
             time.sleep(1)
             if not self.aggregator.ready:
                 continue
 
             now = time.time()
-            timestamp = now  # - (self.aggregator.interval / 5)
+            timestamp = now
             hostprogs_seen = set()
-            interval = None
 
             for values_obj in self.aggregator.get_stats_by_progname(
                 "sqlalchemy_totals", timestamp
             ):
                 hostname = values_obj.host
                 progname = values_obj.plugin_instance
+
+                # TODO: this is awkward, also do we want more per-host
+                # style displays.   do we want to not send host from the
+                # other end, or filter, or what.
+                if progname == "host":
+                    continue
+
+                # TODO: the interval thing here is not very accurate
                 interval = values_obj.interval
 
                 hostprog = self._get_hostprog(
@@ -138,6 +147,11 @@ class Stat(object):
                 hostname = values_obj.host
                 progname = values_obj.plugin_instance
 
+                # TODO: what if the interval is different here?
+
+                if progname == "host":
+                    continue
+
                 hostprog = self._get_hostprog(
                     hostname, progname, hostprogs_seen
                 )
@@ -149,6 +163,10 @@ class Stat(object):
             ):
                 hostname = values_obj.host
                 progname = values_obj.plugin_instance
+                if progname == "host":
+                    continue
+
+                # TODO: the interval is definitely different for "process"
 
                 hostprog = self._get_hostprog(
                     hostname, progname, hostprogs_seen
@@ -163,6 +181,8 @@ class Stat(object):
                         hostprog.progname,
                     ) not in hostprogs_seen:
                         age = now - hostprog.last_time
+
+                        # TODO: use process-specific interval here directly
                         if age > interval * 5:
                             del self.hostprogs[
                                 (hostprog.hostname, hostprog.progname)

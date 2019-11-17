@@ -39,7 +39,6 @@ def start_plugin(config):
     message_sender = protocol.MessageSender(*types)
 
     def sender(values_obj):
-        #        print("translated values_obj: %s" % values_obj)
         message_sender.send(client_connection, values_obj)
 
     values_aggregator = stream.StreamTranslator(
@@ -54,9 +53,18 @@ def start_plugin(config):
 
 
 def write(cd_values_obj):
+    """Receive values from the collectd server in which we are embedded, and
+    send them to an aggregator that will broadcast them to clients.
+
+    The values are received as "external" types, meaning they use the
+    "derive" and "count" types in collectd types.db; an aggregator collects
+    these and builds them into "internal" types which combine multiple
+    types of values into single records.
+
+    """
+
     if cd_values_obj.plugin == COLLECTD_PLUGIN_NAME:
         values_obj = protocol.Values.from_collectd_values(cd_values_obj)
-        # print(values_obj)
         values_aggregator.put_values(values_obj)
 
 

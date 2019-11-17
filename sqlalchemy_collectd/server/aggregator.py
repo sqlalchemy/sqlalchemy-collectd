@@ -25,6 +25,9 @@ class Aggregator(object):
         records = bucket.get_data(timestamp, interval=interval * 2)
         records[(hostname, progname, pid)] = values
 
+        # TODO: aggregator is used both in server and in connmon at the moment
+        # and its connmon role is kind of not quite the same, consider
+        # splitting out for clarity
         if self.include_pids and pid:
             # manufacture a record for that is a single process count for this
             # pid.   we also use a larger interval for this value so that the
@@ -45,6 +48,9 @@ class Aggregator(object):
             sorted(records), key=lambda rec: (rec[0], rec[1])
         ):
             recs = [records[key] for key in keys]
+            # summation here is across pids.
+            # if records are pid-less, then there would be one record
+            # per host/program name.
             values_obj = agg_func(recs).build(
                 time=timestamp, interval=bucket.interval
             )
