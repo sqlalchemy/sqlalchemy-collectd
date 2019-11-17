@@ -87,6 +87,7 @@ class ValueAggregator(object):
             aggregated_value = aggregated_value.build(
                 type=internal_type.name,
                 type_instance=None,
+                time=values_obj.time,
                 values=[
                     per_instance_bucket[external_name].values[0]
                     for external_name in internal_type.names
