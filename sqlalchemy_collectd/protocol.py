@@ -197,8 +197,16 @@ class Values(object):
             values=cd_values_obj.values,
         )
 
-    def send_to_collectd(self, collectd, log):
-        v = collectd.Values(**self._asdict(omit_none=True))
+    def send_to_collectd(self, collectd, log, use_configured_interval=True):
+        data = self._asdict(omit_none=True)
+        if use_configured_interval:
+            # https://collectd.org/documentation/
+            # manpages/collectd-python.5.shtml#configuration
+            # "If this member is set to a non-positive value, the default
+            # value as specified in the config file will be used
+            # (default: 10)."  - hint - they mean zero
+            data["interval"] = 0
+        v = collectd.Values(**data)
         log.debug("send[collectd process] -> %r", v)
         v.dispatch()
 
