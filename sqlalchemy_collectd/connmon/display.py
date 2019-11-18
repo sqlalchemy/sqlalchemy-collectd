@@ -26,6 +26,7 @@ class Display(object):
         self.columns = [
             ("hostname (#R&[dis]#G&connected#d&)", "%s", 0.18, "L"),
             ("progname", "%s", 0.20, "R"),
+            ("last", "%d", 0.08, "R"),
             ("nproc", "%d", 0.08, "R"),
             ("conn", "%d", 0.08, "R"),
             ("ckout", "%d", 0.08, "R"),
@@ -110,8 +111,9 @@ class Display(object):
         render_timer = util.periodic_timer(0.5)
         while self.enabled:
             time.sleep(0.1)
-            if render_timer(time.time()):
-                self._render()
+            now = time.time()
+            if render_timer(now):
+                self._render(now)
             self._handle_cmds()
 
     def _handle_cmds(self):
@@ -169,7 +171,7 @@ class Display(object):
             x, charwidth = next(x_positions)
             self._render_str(y, x, elem, max_=charwidth - 1)
 
-    def _render(self):
+    def _render(self, now):
         self.window.erase()
 
         service_str = self.service_str
@@ -222,12 +224,14 @@ class Display(object):
         )
         for hostprog in hostprogs:
             is_connected = bool(hostprog.process_count)
+            last_metric = hostprog.last_metric(now)
             rows.append(
                 (
                     "#%s&%s"
                     % ("G" if is_connected else "R", hostprog.hostname),
                     "#%s&%s"
                     % ("G" if is_connected else "R", hostprog.progname),
+                    last_metric or 0,
                     hostprog.process_count,
                     hostprog.connection_count,
                     hostprog.checkout_count,

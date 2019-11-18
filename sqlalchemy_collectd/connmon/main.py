@@ -39,7 +39,7 @@ def main(argv=None):
 
     service_str = "[Direct host: %s:%s]" % (options.host, options.port)
 
-    # _dummy_wait()
+    #_dummy_wait()
     display_ = display.Display(stat_, service_str)
     display_.start()
 

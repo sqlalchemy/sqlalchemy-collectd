@@ -17,6 +17,7 @@ class HostProg(object):
         "max_connections",
         "max_checkedout",
         "checkouts_per_second",
+        "interval",
     )
 
     def __init__(self, hostname, progname):
@@ -33,6 +34,9 @@ class HostProg(object):
         self.max_checkedout = 0
         self.checkouts_per_second = None
         self.interval = None
+
+    def last_metric(self, now):
+        return now - self.last_time
 
     def kill_processes(self):
         self.process_count = self.connection_count = self.checkout_count = 0
@@ -82,7 +86,6 @@ class HostProg(object):
                 ) / time_delta
                 self.last_time = timestamp
                 self.total_checkouts = total_checkouts
-
 
 class Stat(object):
     def __init__(self, receiver):
@@ -137,15 +140,13 @@ class Stat(object):
                 hostprog = self._get_hostprog(
                     hostname, progname, hostprogs_seen
                 )
-                hostprog.update_total_stats(timestamp, values_obj)
+                hostprog.update_total_stats(values_obj)
 
             for values_obj in self.receiver.get_stats_by_progname(
                 "sqlalchemy_pool", timestamp
             ):
                 hostname = values_obj.host
                 progname = values_obj.plugin_instance
-
-                # TODO: what if the interval is different here?
 
                 if progname == "host":
                     continue
@@ -163,8 +164,6 @@ class Stat(object):
                 progname = values_obj.plugin_instance
                 if progname == "host":
                     continue
-
-                # TODO: the interval is definitely different for "process"
 
                 hostprog = self._get_hostprog(
                     hostname, progname, hostprogs_seen
