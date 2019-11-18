@@ -33,7 +33,7 @@ class HostProg(object):
         self.max_connections = 0
         self.max_checkedout = 0
         self.checkouts_per_second = None
-        self.interval = None
+        self.interval = 0
 
     def last_metric(self, now):
         return now - self.last_time

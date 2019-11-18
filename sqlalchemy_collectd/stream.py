@@ -104,25 +104,36 @@ class TimeBucket(object):
 
     """
 
-    __slots__ = "bucket", "interval", "last_timestamp"
+    __slots__ = "bucket", "last_timestamp", "interval_factor", "last_interval"
 
     def __init__(self):
         self.bucket = {}
         self.last_timestamp = 0
+        self.last_interval = 0
+        self.interval_factor = 3
 
     def _get_bucket(self, timestamp, interval):
-        if int(timestamp) < int(self.last_timestamp):
+        if interval is not None:
+            self.last_interval = interval
+
+        oldest_to_accept = int(self.last_interval * self.interval_factor)
+
+        if (
+            self.last_interval
+            and int(timestamp) < int(self.last_timestamp) - oldest_to_accept
+        ):
+
             raise ValueError(
                 "bucket timestamp is now %s, "
-                "greater than given timestamp of %s"
-                % (self.last_timestamp, timestamp)
+                "greater than given timestamp of %s plus interval %s"
+                % (self.last_timestamp, timestamp, oldest_to_accept)
             )
-        self.last_timestamp = timestamp
         for k in list(self.bucket):
             ts, b_interval, value = self.bucket[k]
-            if ts < timestamp - int(b_interval * 1.5):
+            if ts < timestamp - int(b_interval * self.interval_factor):
                 del self.bucket[k]
 
+        self.last_timestamp = timestamp
         return DictFacade(timestamp, interval, self.bucket)
 
     def put(self, timestamp, interval, key, data):

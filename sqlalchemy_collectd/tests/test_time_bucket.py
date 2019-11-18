@@ -28,7 +28,7 @@ class TimeBucketTest(unittest.TestCase):
         self.assertEqual(agg.get(50568, "key"), None)
 
         # can't look at previous time now
-        self.assertRaises(ValueError, agg.get, 50539, "key")
+        self.assertRaises(ValueError, agg.get, 50535, "key")
 
         agg.put(50570, interval, "key", "value_50545")
 

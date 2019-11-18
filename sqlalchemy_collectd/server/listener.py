@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import logging
 import threading
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("sqlalchemy_collectd")
 
 
 def _receive(receiver):
