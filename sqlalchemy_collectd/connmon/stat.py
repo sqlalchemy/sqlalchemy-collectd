@@ -3,30 +3,17 @@ import time
 
 
 class HostProg(object):
-    __slots__ = (
-        "last_time",
-        "hostname",
-        "progname",
-        "total_checkouts",
-        "process_count",
-        "connection_count",
-        "checkout_count",
-        "max_process_count",
-        "max_connections",
-        "max_checkedout",
-        "checkouts_per_second",
-        "interval",
-    )
-
     def __init__(self, hostname, progname):
         self.last_time = 0
         self.hostname = hostname
         self.progname = progname
 
-        self.total_checkouts = -1
-        self.process_count = 0
-        self.connection_count = 0
-        self.checkout_count = 0
+        self.total_checkouts = None
+        self.last_total_checkout_time = None
+
+        self.process_count = None
+        self.connection_count = None
+        self.checkout_count = None
         self.max_process_count = 0
         self.max_connections = 0
         self.max_checkedout = 0
@@ -81,14 +68,16 @@ def update_connection_count(values_obj, value, hostprog):
 def update_total_checkouts(values_obj, value, hostprog):
     total_checkouts = value
 
-    time_delta = values_obj.interval
+    if hostprog.last_total_checkout_time:
+        time_delta = values_obj.time - hostprog.last_total_checkout_time
 
-    if time_delta > 0 and hostprog.total_checkouts > 0:
-        hostprog.checkouts_per_second = (
-            total_checkouts - hostprog.total_checkouts
-        ) / time_delta
+        if time_delta > 0 and hostprog.total_checkouts > 0:
+            hostprog.checkouts_per_second = (
+                total_checkouts - hostprog.total_checkouts
+            ) / time_delta
 
     hostprog.total_checkouts = total_checkouts
+    hostprog.last_total_checkout_time = values_obj.time
 
 
 class Stat(object):
@@ -180,13 +169,19 @@ class Stat(object):
     def update_host_stats(self):
         self.host_count = len(set(host for (host, prog) in self.hostprogs))
         self.process_count = sum(
-            hostprog.process_count for hostprog in self.hostprogs.values()
+            hostprog.process_count
+            for hostprog in self.hostprogs.values()
+            if hostprog.process_count is not None
         )
         self.connection_count = sum(
-            hostprog.connection_count for hostprog in self.hostprogs.values()
+            hostprog.connection_count
+            for hostprog in self.hostprogs.values()
+            if hostprog.connection_count is not None
         )
         self.checkout_count = sum(
-            hostprog.checkout_count for hostprog in self.hostprogs.values()
+            hostprog.checkout_count
+            for hostprog in self.hostprogs.values()
+            if hostprog.checkout_count is not None
         )
         self.checkouts_per_second = sum(
             hostprog.checkouts_per_second

@@ -167,7 +167,10 @@ class Display(object):
         x_positions = iter(self._x_positions)
         for elem, col in zip(row, self.columns):
             cname, fmt, width, justify = col
-            elem = fmt % (elem,)
+            if elem is None:
+                elem = ""
+            else:
+                elem = fmt % (elem,)
             x, charwidth = next(x_positions)
             self._render_str(y, x, elem, max_=charwidth - 1)
 
