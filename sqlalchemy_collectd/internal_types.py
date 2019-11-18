@@ -43,3 +43,8 @@ transactions_internal = protocol.Type(
     ("rollbacks", protocol.VALUE_DERIVE),
     ("transactions", protocol.VALUE_DERIVE),
 )
+
+
+count_external = protocol.Type("count", ("value", protocol.VALUE_GAUGE))
+
+derive_external = protocol.Type("derive", ("value", protocol.VALUE_DERIVE))

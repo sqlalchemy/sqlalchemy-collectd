@@ -5,8 +5,8 @@ import logging
 
 from . import display
 from . import stat
-from ..server import listener
-from ..server import receiver
+from .. import internal_types
+from .. import protocol
 
 log = logging.getLogger(__name__)
 
@@ -28,18 +28,17 @@ def main(argv=None):
     )
     options = parser.parse_args(argv)
 
-    receiver_ = receiver.Receiver(
-        options.host, options.port, log, include_pids=False
+    network_receiver = protocol.NetworkReceiver(
+        protocol.ServerConnection(options.host, options.port, log),
+        [internal_types.count_external, internal_types.derive_external],
     )
 
-    listener.listen(receiver_)
-
-    stat_ = stat.Stat(receiver_)
+    stat_ = stat.Stat(network_receiver, log)
     stat_.start()
 
     service_str = "[Direct host: %s:%s]" % (options.host, options.port)
 
-    #_dummy_wait()
+    # _dummy_wait()
     display_ = display.Display(stat_, service_str)
     display_.start()
 
@@ -48,7 +47,7 @@ def _dummy_wait():
     import time
     import logging
 
-    logging.basicConfig()
+    # logging.basicConfig()
     log.setLevel(logging.DEBUG)
 
     while True:

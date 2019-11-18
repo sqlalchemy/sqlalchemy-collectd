@@ -233,7 +233,7 @@ class Display(object):
                     % ("G" if is_connected else "R", hostprog.progname),
                     "#%s&%d/%d"
                     % (
-                        "G" if last_metric <= hostprog.interval else "R",
+                        "G" if last_metric <= hostprog.interval + 5 else "R",
                         last_metric,
                         hostprog.interval,
                     ),

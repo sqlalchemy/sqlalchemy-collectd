@@ -1,7 +1,5 @@
 import unittest
 
-import mock
-
 from .. import protocol
 from .. import stream
 
@@ -147,50 +145,3 @@ class BreakIntoValuesTest(unittest.TestCase):
         for v in data:
             l.extend(translator.break_into_individual_values(v))
         self.assertEqual(l, self._external_stream_one_element())
-
-    def test_combine_by_time(self):
-        type_ = protocol.Type(
-            "my_type",
-            ("some_val", protocol.VALUE_GAUGE),
-            ("some_other_val", protocol.VALUE_DERIVE),
-            ("some_third_val", protocol.VALUE_DERIVE),
-        )
-
-        collector = mock.Mock()
-        aggregator = stream.StreamTranslator(
-            type_
-        ).combine_into_grouped_values(collector)
-
-        for v in self._external_stream():
-            aggregator.put_values(v)
-
-        # when single-value events are combined back into "internal" types,
-        # the "type_instance" value is lost; this is only used to collect
-        # the pid up front so is not part of any aggregate data in any case.
-        self.assertEqual(
-            collector.mock_calls,
-            [mock.call(v) for v in self._internal_stream(type_instance=None)],
-        )
-
-    def test_combine_by_time_one_element(self):
-        type_ = protocol.Type(
-            "my_type_one_element", ("some_val", protocol.VALUE_GAUGE)
-        )
-
-        collector = mock.Mock()
-        aggregator = stream.StreamTranslator(
-            type_
-        ).combine_into_grouped_values(collector)
-
-        for v in self._external_stream_one_element():
-            aggregator.put_values(v)
-
-        # for single-value external elements to internal elements, make
-        # sure type_instance is set to None
-        self.assertEqual(
-            collector.mock_calls,
-            [
-                mock.call(v)
-                for v in self._internal_stream_one_element(type_instance=None)
-            ],
-        )

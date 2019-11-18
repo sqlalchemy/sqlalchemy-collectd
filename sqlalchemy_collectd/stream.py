@@ -50,52 +50,6 @@ class StreamTranslator(object):
                 values=[value_element],
             )
 
-    def combine_into_grouped_values(self, consumer_fn):
-        return ValueAggregator(self, consumer_fn)
-
-
-class ValueAggregator(object):
-    def __init__(self, stream_translator, consumer_fn):
-        self.stream_translator = stream_translator
-        self.consumer_fn = consumer_fn
-        self.time_bucket = TimeBucket()
-        self.buckets = {
-            type_.name: TimeBucket()
-            for type_ in stream_translator.internal_types
-        }
-
-    def put_values(self, values_obj):
-        external_type = self.stream_translator.external_types[
-            values_obj.type_instance
-        ]
-        internal_type = self.stream_translator.external_type_to_internal[
-            external_type
-        ]
-        bucket = self.buckets[internal_type.name]
-        bucket_data = bucket.get_data(values_obj.time, values_obj.interval * 4)
-
-        key = (values_obj.plugin_instance,)
-        if key not in bucket_data:
-            bucket_data[key] = per_instance_bucket = {}
-        else:
-            per_instance_bucket = bucket_data[key]
-
-        external_name = external_type.name
-        per_instance_bucket[external_name] = values_obj
-        if len(per_instance_bucket) == len(internal_type.names):
-            aggregated_value = sum(per_instance_bucket.values())
-            aggregated_value = aggregated_value.build(
-                type=internal_type.name,
-                type_instance=None,
-                time=values_obj.time,
-                values=[
-                    per_instance_bucket[external_name].values[0]
-                    for external_name in internal_type.names
-                ],
-            )
-            del bucket_data[key]
-            self.consumer_fn(aggregated_value)
-
 
 class TimeBucket(object):
     """Store objects based on the latest one received, discarding
@@ -110,7 +64,7 @@ class TimeBucket(object):
         self.bucket = {}
         self.last_timestamp = 0
         self.last_interval = 0
-        self.interval_factor = 3
+        self.interval_factor = 1.2
 
     def _get_bucket(self, timestamp, interval):
         if interval is not None:
