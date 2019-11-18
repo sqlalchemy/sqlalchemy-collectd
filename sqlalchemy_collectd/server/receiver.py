@@ -32,7 +32,7 @@ class Receiver(object):
         self.translator = stream.StreamTranslator(*self.internal_types)
         self.bucket_names = [t.name for t in self.internal_types]
         self.buckets = {
-            name: stream.TimeBucket(4) for name in self.bucket_names
+            name: stream.TimeBucket() for name in self.bucket_names
         }
         self.include_pids = include_pids
 
@@ -68,6 +68,7 @@ class Receiver(object):
 
         bucket = self.buckets[bucket_name]
         records = bucket.get_data(timestamp, interval=interval * 2)
+
         records[(hostname, progname, pid)] = values
 
         if self.include_pids and pid:
@@ -85,15 +86,17 @@ class Receiver(object):
     def get_stats_by_progname(self, bucket_name, timestamp, agg_func=sum):
         bucket = self.buckets[bucket_name]
         records = bucket.get_data(timestamp)
+
         for (hostname, progname), keys in itertools.groupby(
             sorted(records), key=lambda rec: (rec[0], rec[1])
         ):
             recs = [records[key] for key in keys]
+            interval = recs[0].interval
             # summation here is across pids.
             # if records are pid-less, then there would be one record
             # per host/program name.
             values_obj = agg_func(recs).build(
-                time=timestamp, interval=bucket.interval
+                time=timestamp, interval=interval
             )
             yield values_obj
 
@@ -104,9 +107,8 @@ class Receiver(object):
             sorted(records), key=lambda rec: rec[0]
         ):
             recs = [records[key] for key in keys]
+            interval = recs[0].interval
             values_obj = agg_func(recs).build(
-                plugin_instance="host",
-                time=timestamp,
-                interval=bucket.interval,
+                plugin_instance="host", time=timestamp, interval=interval
             )
             yield values_obj

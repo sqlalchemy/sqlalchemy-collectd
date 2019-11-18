@@ -12,13 +12,8 @@ class TimeBucketTest(unittest.TestCase):
             yield current
             current += random.randint(0, interval // 2)
 
-    def test_no_conflicting_intervals(self):
-        agg = stream.TimeBucket(4)
-        agg.put(50530, 10, "key", "value_50530")
-        self.assertRaises(ValueError, agg.put, 50530, 15, "key", "value_50530")
-
     def test_put(self):
-        agg = stream.TimeBucket(4)
+        agg = stream.TimeBucket()
         interval = 10
         agg.put(50530, interval, "key", "value_50530")
 
@@ -30,52 +25,22 @@ class TimeBucketTest(unittest.TestCase):
         self.assertEqual(agg.get(50538, "key"), "value_50534")
 
         # bucket has expired with this timestamp
-        self.assertEqual(agg.get(50542, "key"), None)
+        self.assertEqual(agg.get(50568, "key"), None)
 
-        # but we can still see it w/ recent timestamp
-        self.assertEqual(agg.get(50539, "key"), "value_50534")
+        # can't look at previous time now
+        self.assertRaises(ValueError, agg.get, 50539, "key")
 
-        # current bucket
-        agg.put(50545, interval, "key", "value_50545")
+        agg.put(50570, interval, "key", "value_50545")
 
-        # bump
-        agg.put(50556, interval, "key", "value_50556")
+        self.assertEqual(agg.get(50570, "key"), "value_50545")
+        self.assertEqual(agg.get(50570.375, "key"), "value_50545")
+        self.assertEqual(agg.get(50570, "key"), "value_50545")
 
-        # still see old value
-        self.assertEqual(agg.get(50539, "key"), "value_50534")
-
-        # bump
-        agg.put(50562, interval, "key", "value_50562")
-
-        # still see old value
-        self.assertEqual(agg.get(50539, "key"), "value_50534")
-        self.assertEqual(agg.get_data(50539)["key"], "value_50534")
+        # can't see old value
+        self.assertRaises(ValueError, agg.get, 50539, "key")
 
         # bump
-        agg.put(50574, interval, "key", "value_50574")
+        agg.put(50580, interval, "key", "value_50562")
 
-        # now it's gone
-        self.assertRaises(KeyError, agg.get_data, 50539)
-
-    def test_series(self):
-        agg = stream.TimeBucket(4)
-        previous_time = None
-        for round_, time in enumerate(self._generate(10)):
-            if round_ % 4 == 1:
-                value = agg.get(time, "key", interval=10)
-                if value is None:
-                    assert previous_time // 10 != time // 10
-                else:
-                    assert previous_time // 10 == time // 10
-                    self.assertEqual(
-                        max(
-                            [
-                                bucket["data"].get("key", "")
-                                for bucket in agg.buckets
-                            ]
-                        ),
-                        value,
-                    )
-            else:
-                agg.put(time, 10, "key", "value_%s" % time)
-            previous_time = time
+        # can't see old value
+        self.assertRaises(ValueError, agg.get, 50539, "key")

@@ -26,7 +26,7 @@ class Display(object):
         self.columns = [
             ("hostname (#R&[dis]#G&connected#d&)", "%s", 0.18, "L"),
             ("progname", "%s", 0.20, "R"),
-            ("last", "%d", 0.08, "R"),
+            ("last", "%s", 0.08, "R"),
             ("nproc", "%d", 0.08, "R"),
             ("conn", "%d", 0.08, "R"),
             ("ckout", "%d", 0.08, "R"),
@@ -231,7 +231,12 @@ class Display(object):
                     % ("G" if is_connected else "R", hostprog.hostname),
                     "#%s&%s"
                     % ("G" if is_connected else "R", hostprog.progname),
-                    last_metric or 0,
+                    "#%s&%d/%d"
+                    % (
+                        "G" if last_metric <= hostprog.interval else "R",
+                        last_metric,
+                        hostprog.interval,
+                    ),
                     hostprog.process_count,
                     hostprog.connection_count,
                     hostprog.checkout_count,

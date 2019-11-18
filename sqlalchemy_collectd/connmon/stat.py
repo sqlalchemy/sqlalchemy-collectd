@@ -87,6 +87,7 @@ class HostProg(object):
                 self.last_time = timestamp
                 self.total_checkouts = total_checkouts
 
+
 class Stat(object):
     def __init__(self, receiver):
         self.receiver = receiver

@@ -58,9 +58,9 @@ class ValueAggregator(object):
     def __init__(self, stream_translator, consumer_fn):
         self.stream_translator = stream_translator
         self.consumer_fn = consumer_fn
-        self.time_bucket = TimeBucket(4)
+        self.time_bucket = TimeBucket()
         self.buckets = {
-            type_.name: TimeBucket(4)
+            type_.name: TimeBucket()
             for type_ in stream_translator.internal_types
         }
 
@@ -98,91 +98,74 @@ class ValueAggregator(object):
 
 
 class TimeBucket(object):
-    """Store the last N seconds of time-stamped data within
-    interval-keyed buckets.
-
-    The idea is we can store and retrieve records that were
-    within the last N seconds only, or in the previous
-    2N-N seconds, or 3N-2N seconds, including that we can efficiently
-    clean up old ranges in O(1) time.
-
-    E.g. assume four buckets and interval of 100::
-
-        bucket[0] -> timestamp 50000-50100
-        bucket[1] -> timestamp 50101-50200
-        bucket[2] -> timestamp 50201-50300
-        bucket[3] -> timestamp 50301-50400
-
-    100 seconds later::
-
-        bucket[0] -> timestamp 50401-50500
-        bucket[1] -> timestamp 50101-50200
-        bucket[2] -> timestamp 50201-50300
-        bucket[3] -> timestamp 50301-50400
-
-    100 seconds later::
-
-        bucket[0] -> timestamp 50401-50500
-        bucket[1] -> timestamp 50501-50600
-        bucket[2] -> timestamp 50201-50300
-        bucket[3] -> timestamp 50301-50400
-
-    etc.
-
-    The object assumes if a new timestamp is coming in that is newer
-    than the current bucket, we go to the next bucket.   If the next bucket
-    has data from the old range it had B buckets ago, we empty it out first.
+    """Store objects based on the latest one received, discarding
+    those that are stale based on the timestamp / interval given for that
+    value.
 
     """
 
-    __slots__ = "num_buckets", "buckets", "interval"
+    __slots__ = "bucket", "interval", "last_timestamp"
 
-    def __init__(self, num_buckets):
-        self.num_buckets = num_buckets
-        self.buckets = [
-            {"slot": None, "data": {}, "timestamp": 0}
-            for i in range(num_buckets)
-        ]
-        self.interval = None
+    def __init__(self):
+        self.bucket = {}
+        self.last_timestamp = 0
 
     def _get_bucket(self, timestamp, interval):
-        if interval is not None:
-            if self.interval != interval:
-                if self.interval is None:
-                    self.interval = interval
-                else:
-                    raise ValueError(
-                        "current time bucket interval %d does not match "
-                        "incoming interval %d" % (self.interval, interval)
-                    )
-        assert self.interval is not None
-        timestamp = int(timestamp)
-        slot = int(timestamp // self.interval)
-        bucket_num = slot % self.num_buckets
-        bucket = self.buckets[bucket_num]
-        bucket_slot = bucket["slot"]
-        if bucket_slot is None:
-            bucket["slot"] = slot
-            bucket["timestamp"] = timestamp
-        elif bucket_slot < slot:
-            bucket["data"].clear()
-            bucket["slot"] = slot
-            bucket["timestamp"] = timestamp
-        elif bucket_slot > slot:
-            raise KeyError()
-        return bucket
+        if int(timestamp) < int(self.last_timestamp):
+            raise ValueError(
+                "bucket timestamp is now %s, "
+                "greater than given timestamp of %s"
+                % (self.last_timestamp, timestamp)
+            )
+        self.last_timestamp = timestamp
+        for k in list(self.bucket):
+            ts, b_interval, value = self.bucket[k]
+            if ts < timestamp - int(b_interval * 1.5):
+                del self.bucket[k]
+
+        return DictFacade(timestamp, interval, self.bucket)
 
     def put(self, timestamp, interval, key, data):
-        bucket_data = self._get_bucket(timestamp, interval)["data"]
+        bucket_data = self._get_bucket(timestamp, interval)
         bucket_data[key] = data
         return bucket_data
 
     def get(self, current_time, key, interval=None):
-        if interval is None and self.interval is None:
-            return None
-        return self._get_bucket(current_time, interval)["data"].get(key)
+        return self._get_bucket(current_time, interval).get(key)
 
     def get_data(self, current_time, interval=None):
-        if interval is None and self.interval is None:
-            return {}
-        return self._get_bucket(current_time, interval)["data"]
+        return self._get_bucket(current_time, interval)
+
+
+class DictFacade(object):
+    __slots__ = "timestamp", "interval", "dictionary"
+
+    def __init__(self, timestamp, interval, dictionary):
+        self.timestamp = timestamp
+        self.interval = interval
+        self.dictionary = dictionary
+
+    def __contains__(self, key):
+        return key in self.dictionary
+
+    def get(self, key, default=None):
+        timestamp, interval, value = self.dictionary.get(
+            key, (None, None, default)
+        )
+        return value
+
+    def __getitem__(self, key):
+        timestamp, interval, value = self.dictionary[key]
+        return value
+
+    def __setitem__(self, key, value):
+        self.dictionary[key] = (self.timestamp, self.interval, value)
+
+    def __delitem__(self, key):
+        del self.dictionary[key]
+
+    def __iter__(self):
+        return iter(self.dictionary)
+
+    def keys(self):
+        return self.dictionary.keys()
