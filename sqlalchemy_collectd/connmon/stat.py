@@ -32,6 +32,7 @@ class HostProg(object):
         self.max_connections = 0
         self.max_checkedout = 0
         self.checkouts_per_second = None
+        self.interval = None
 
     def kill_processes(self):
         self.process_count = self.connection_count = self.checkout_count = 0
@@ -56,7 +57,10 @@ class HostProg(object):
         ]
         self.max_connections = max(self.max_connections, self.connection_count)
 
-    def update_total_stats(self, interval, timestamp, stats):
+    def update_total_stats(self, stats):
+
+        self.interval = interval = stats.interval
+        timestamp = stats.time
 
         total_checkouts = stats.values[
             internal_types.totals_internal.get_stat_index("checkouts")
@@ -110,7 +114,6 @@ class Stat(object):
         return hostprog
 
     def _update(self):
-        interval = None
 
         while True:
             time.sleep(1)
@@ -131,13 +134,10 @@ class Stat(object):
                 if progname == "host":
                     continue
 
-                # TODO: the interval thing here is not very accurate
-                interval = values_obj.interval
-
                 hostprog = self._get_hostprog(
                     hostname, progname, hostprogs_seen
                 )
-                hostprog.update_total_stats(interval, timestamp, values_obj)
+                hostprog.update_total_stats(timestamp, values_obj)
 
             for values_obj in self.receiver.get_stats_by_progname(
                 "sqlalchemy_pool", timestamp
@@ -172,21 +172,22 @@ class Stat(object):
 
                 hostprog.update_process_stats(values_obj)
 
-            if interval is not None:
-                for hostprog in list(self.hostprogs.values()):
-                    if (
-                        hostprog.hostname,
-                        hostprog.progname,
-                    ) not in hostprogs_seen:
-                        age = now - hostprog.last_time
+            for hostprog in list(self.hostprogs.values()):
+                if (
+                    hostprog.hostname,
+                    hostprog.progname,
+                ) not in hostprogs_seen:
+                    if hostprog.interval is None:
+                        continue
 
-                        # TODO: use process-specific interval here directly
-                        if age > interval * 5:
-                            del self.hostprogs[
-                                (hostprog.hostname, hostprog.progname)
-                            ]
-                        elif age > interval:
-                            hostprog.kill_processes()
+                    age = now - hostprog.last_time
+
+                    if age > hostprog.interval * 5:
+                        del self.hostprogs[
+                            (hostprog.hostname, hostprog.progname)
+                        ]
+                    elif age > hostprog.interval:
+                        hostprog.kill_processes()
 
             self.update_host_stats()
 
