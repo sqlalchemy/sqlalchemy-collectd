@@ -71,7 +71,7 @@ def update_total_checkouts(values_obj, value, hostprog):
     if hostprog.last_total_checkout_time:
         time_delta = values_obj.time - hostprog.last_total_checkout_time
 
-        if time_delta > 0 and hostprog.total_checkouts > 0:
+        if time_delta >= values_obj.interval and hostprog.total_checkouts > 0:
             hostprog.checkouts_per_second = (
                 total_checkouts - hostprog.total_checkouts
             ) / time_delta
