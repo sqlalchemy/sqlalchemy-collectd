@@ -1,3 +1,5 @@
+from __future__ import division
+
 import threading
 import time
 
@@ -9,6 +11,7 @@ class HostProg(object):
         self.progname = progname
 
         self.total_checkouts = None
+        self.last_checkouts = None
         self.last_total_checkout_time = None
 
         self.process_count = None
@@ -69,11 +72,13 @@ def update_total_checkouts(values_obj, value, hostprog):
     total_checkouts = value
 
     if hostprog.last_total_checkout_time:
+
+        hostprog.last_checkouts = total_checkouts - hostprog.total_checkouts
         time_delta = values_obj.time - hostprog.last_total_checkout_time
 
         if time_delta >= values_obj.interval and hostprog.total_checkouts > 0:
             hostprog.checkouts_per_second = (
-                total_checkouts - hostprog.total_checkouts
+                hostprog.last_checkouts
             ) / time_delta
 
     hostprog.total_checkouts = total_checkouts

@@ -29,7 +29,7 @@ class Display(object):
             ("last", "%s", 0.08, "R"),
             ("nproc", "%d", 0.08, "R"),
             ("conn", "%d", 0.08, "R"),
-            ("ckout", "%d", 0.08, "R"),
+            ("ckout", "%s", 0.08, "R"),
             ("maxnproc", "%d", 0.08, "R"),
             ("maxconn", "%d", 0.08, "R"),
             ("maxckout", "%d", 0.08, "R"),
@@ -242,7 +242,15 @@ class Display(object):
                     ),
                     hostprog.process_count,
                     hostprog.connection_count,
-                    hostprog.checkout_count,
+                    "%s/%s"
+                    % (
+                        ("%d" % hostprog.checkout_count)
+                        if hostprog.checkout_count is not None
+                        else "",
+                        ("%d" % hostprog.last_checkouts)
+                        if hostprog.last_checkouts is not None
+                        else "",
+                    ),
                     hostprog.max_process_count,
                     hostprog.max_connections,
                     hostprog.max_checkedout,
