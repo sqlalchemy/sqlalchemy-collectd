@@ -1,3 +1,5 @@
+import threading
+
 from .. import internal_types
 from .. import protocol
 
@@ -14,6 +16,9 @@ def sends(protocol_type):
 
 
 class Sender(object):
+    senders = {}
+    create_mutex = threading.Lock()
+
     def __init__(
         self,
         hostname,
@@ -33,17 +38,35 @@ class Sender(object):
             [protocol_type for protocol_type, sender in senders],
         )
 
-    def send(self, collection_target, timestamp, interval, pid):
+    def send(self, collection_target, timestamp, interval, process_token):
         values = protocol.Values(
             host=self.hostname,
             plugin=self.plugin,
             plugin_instance=self.stats_name,
-            type_instance=str(pid),
+            type_instance=str(process_token),
             interval=interval,
             time=timestamp,
         )
         for protocol_type, sender in senders:
             self.message_sender.send(sender(values, collection_target))
+
+    @classmethod
+    def get_sender(
+        cls, hostname, stats_name, collectd_host, collectd_port, log
+    ):
+        cls.create_mutex.acquire()
+        try:
+            key = (hostname, stats_name, collectd_host, collectd_port)
+            if key not in cls.senders:
+                sender = cls.senders[key] = Sender(
+                    hostname, stats_name, collectd_host, collectd_port, log
+                )
+                return sender
+            else:
+                return cls.senders[key]
+
+        finally:
+            cls.create_mutex.release()
 
 
 @sends(internal_types.pool_internal)

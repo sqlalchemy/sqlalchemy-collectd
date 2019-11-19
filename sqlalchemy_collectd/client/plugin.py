@@ -73,13 +73,18 @@ def start_plugin(
     if progname is None:
         progname = os.path.basename(sys.argv[0])
 
+    # registry on progname
     collection_target = collector.CollectionTarget.collection_for_name(
         progname
     )
+
+    # unique per Engine
     collector.EngineCollector(collection_target, engine)
 
-    sender_ = sender.Sender(
+    # registry on host/prog/host/port
+    sender_ = sender.Sender.get_sender(
         hostname, progname, collectd_host, collectd_port, log
     )
 
+    # registry on collection_target / sender
     worker.add_target(collection_target, sender_)
