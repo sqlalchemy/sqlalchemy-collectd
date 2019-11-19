@@ -1,3 +1,5 @@
+from __future__ import division
+
 import curses
 import functools
 import operator
@@ -21,27 +23,78 @@ COLOR_MAP = {
 _TEXT_RE = re.compile(r"(#.+?)&", re.M)
 
 
-class Display(object):
-    def __init__(self, stat, service_str):
-        self.columns = [
-            ("hostname (#R&[dis]#G&connected#d&)", "%s", 0.18, "L"),
-            ("progname", "%s", 0.20, "R"),
-            ("last", "%s", 0.08, "R"),
-            ("nproc", "%d", 0.08, "R"),
-            ("conn", "%d", 0.08, "R"),
-            ("ckout", "%s", 0.08, "R"),
-            ("maxnproc", "%d", 0.08, "R"),
-            ("maxconn", "%d", 0.08, "R"),
-            ("maxckout", "%d", 0.08, "R"),
-            ("ckoutpersec", "%s", 0.08, "R"),
+def _text_width(text):
+    return max(len(_TEXT_RE.sub("", x)) for x in text.split("\n"))
+
+
+def _just(text, width):
+    padding = (width - len(text)) / 2
+    return (" " * int(padding)) + text
+
+
+def _justify_rows(text):
+    width = _text_width(text)
+    return [_just(row, width) for row in text.split("\n")]
+    # return text.split("\n")
+
+
+class Layout(object):
+    def enable(self, display):
+        pass
+
+    def press_escape(self, display):
+        pass
+
+
+class TextLayout(Layout):
+    def render(self, display, now):
+        top = 6
+
+        for ypos, line in enumerate(self.get_lines(), top):
+            display._render_str(ypos, 5, line)
+
+
+class KeyLayout(TextLayout):
+    def enable(self, display):
+        self.previous_screen = display.screen
+
+    def press_escape(self, display):
+        display._refresh_winsize(self.previous_screen)
+
+    def get_lines(self):
+        return [
+            "#b&++========++",
+            "#b&|| Legend ||",
+            "#b&++========++",
+            "#b&hostname        - #n&Hostname of source machine, ",
+            "                  #G&green#d& if currently sending stats, ",
+            "                  #R&red#n& if no stats are being received",
+            "#b&progname        - #n&program name reported by client",
+            "#b&last msg        - #n&number of seconds since last message / ",
+            "                  interval between messages in seconds",
+            "#b&processes       - #n&number of processes "
+            "(with database stats):",
+            "                  current reported / max since monitor started",
+            "#b&connections     - #n&number of connections: ",
+            "                  current reported / max since monitor started /",
+            "                  number since last interval",
+            "#b&checkouts       - #n&number of checkouts: ",
+            "                  current reported / max since monitor started /",
+            "                  number since last interval",
+            "#b&checkouts / sec - #n&checkouts per second:",
+            "                  based on number of checkouts since last ",
+            "                  interval divided by interval",
         ]
-        self.stat = stat
-        self.service_str = service_str
 
-        self._winsize = None
-        self._x_positions = None
 
-    def _calc_x_positions(self):
+class StatLayout(Layout):
+    def enable(self, display):
+        self._calc_x_positions(display)
+
+    def get_rows(self, display, stat, now):
+        raise NotImplementedError()
+
+    def _calc_x_positions(self, display):
         x = 0
         widths = []
         midline = False
@@ -49,16 +102,18 @@ class Display(object):
             cname = col[0]
             width = col[2]
             just = col[3]
-            charwidth = max(len(cname), int(self._winsize[1] * width))
+            charwidth = max(
+                _text_width(cname), int(display._winsize[1] * width)
+            )
             if just == "L":
                 widths.append((x, charwidth))
                 x += charwidth
             else:
                 width = sum(
-                    max(len(col[0]), int(self._winsize[1] * col[2]))
+                    max(_text_width(cname), int(display._winsize[1] * width))
                     for col in self.columns[idx:]
                 )
-                x = self._winsize[1] - width
+                x = display._winsize[1] - width
                 if not midline:
                     midline = True
                     midline_at = widths[-1][0] + widths[-1][1]
@@ -72,15 +127,171 @@ class Display(object):
 
         self._x_positions = widths
 
-    def _refresh_winsize(self):
+    def _render_row(self, display, row, y):
+        x_positions = iter(self._x_positions)
+        for elem, col in zip(row, self.columns):
+            cname, fmt, width, justify = col
+
+            elem = "  ".join(
+                [
+                    (fmt_frag % elem_frag) if elem_frag is not None else "-"
+                    for fmt_frag, elem_frag in zip(fmt.split("/"), elem)
+                ]
+            )
+            x, charwidth = next(x_positions)
+            display._render_str(y, x, elem)  # , max_=charwidth - 1)
+
+    def render(self, display, now):
+        stat = display.stat
+
+        display._render_str(
+            2,
+            0,
+            "#Mb&Hosts: #Dn&[%d curr / %d max]  "
+            "#Mb&Processes: #Dn&[%d curr / %d max]  "
+            % (
+                stat.host_count,
+                stat.max_host_count,
+                stat.process_count,
+                stat.max_process_count,
+            ),
+            "Wb",
+        )
+        display._render_str(
+            3,
+            0,
+            "#Mb&Connections: #Dn&[%d curr / %d max]  "
+            "#Mb&Checkouts: #Dn&[%d curr / %d max / %s]"
+            % (
+                stat.connection_count,
+                stat.max_connections,
+                stat.checkout_count,
+                stat.max_checkedout,
+                ("%.2f / sec" % stat.checkouts_per_second)
+                if stat.checkouts_per_second is not None
+                else "<calc>",
+            ),
+            "Wb",
+        )
+
+        top = 6
+
+        x_positions = iter(self._x_positions)
+        for col in self.columns:
+            cname, fmt, width, justify = col
+            x, charwidth = next(x_positions)
+            rows = _justify_rows(cname)
+            display._render_str(top, x, rows[0], "Cb")
+            if len(rows) > 1:
+                display._render_str(top + 1, x, rows[1], "Cb")
+
+        rows = self.get_rows(display, stat, now)
+
+        for y, row in enumerate(rows, top + 2):
+            self._render_row(display, row, y)
+
+
+class ProgStatsLayout(StatLayout):
+    columns = [
+        ("hostname\n(#R&[dis]#G&connected#d&)", "%s", 0.12, "L"),
+        ("progname", "%s", 0.15, "L"),
+        ("last msg\nsecs / int", "%s/%3d", 0.15, "R"),
+        ("processes\ncurr / max", "%4d/%4d", 0.15, "R"),
+        ("connections\ncurr / max / int", "%4d/%4d/%4d", 0.15, "R"),
+        ("checkouts\ncurr / max / int", "%4d/%4d/%4d", 0.15, "R"),
+        ("checkouts\n/sec", "%.2f", 0.15, "R"),
+    ]
+
+    def row_for_hostprog(self, hostprog, now):
+        is_connected = bool(hostprog.process_count)
+        last_metric = hostprog.last_metric(now)
+
+        host_row = (
+            ("#%s&%s" % ("G" if is_connected else "R", hostprog.hostname),),
+        )
+        if hostprog.progname is not None:
+            host_row += ((hostprog.progname,),)
+
+        host_row += (
+            (
+                "#%s&%d"
+                % (
+                    "G" if last_metric <= hostprog.interval + 5 else "R",
+                    last_metric,
+                ),
+                hostprog.interval,
+            ),
+            (hostprog.process_count, hostprog.max_process_count),
+            (
+                hostprog.connection_count,
+                hostprog.max_connections,
+                hostprog.interval_connects,
+            ),
+            (
+                hostprog.checkout_count,
+                hostprog.max_checkedout,
+                hostprog.interval_checkouts,
+            ),
+            (hostprog.checkouts_per_second,),
+        )
+        return host_row
+
+    def get_rows(self, display, stat, now):
+        rows = []
+        hostprogs = list(stat.hostprogs.values())
+        hostprogs.sort(
+            key=lambda hostprog: (hostprog.hostname, hostprog.progname)
+        )
+        for hostprog in hostprogs:
+            rows.append(self.row_for_hostprog(hostprog, now))
+
+        return rows
+
+
+class HostStatsLayout(ProgStatsLayout):
+    columns = [
+        ("hostname\n(#R&[dis]#G&connected#d&)", "%s", 0.12, "L"),
+        ("last msg\nsecs / int", "%s/%3d", 0.15, "R"),
+        ("processes\ncurr / max", "%4d/%4d", 0.15, "R"),
+        ("connections\ncurr / max / int", "%4d/%4d/%4d", 0.15, "R"),
+        ("checkouts\ncurr / max / int", "%4d/%4d/%4d", 0.15, "R"),
+        ("checkouts\n/sec", "%3.2f", 0.15, "R"),
+    ]
+
+    def get_rows(self, display, stat, now):
+        rows = []
+        hostprogs = list(stat.hosts.values())
+        hostprogs.sort(key=lambda hostprog: (hostprog.hostname,))
+        for hostprog in hostprogs:
+            rows.append(self.row_for_hostprog(hostprog, now))
+
+        return rows
+
+
+class Display(object):
+    def __init__(self, stat, service_str):
+        self.stat = stat
+        self.service_str = service_str
+
+        self._winsize = None
+
+    def _refresh_winsize(self, screen=None):
         old_winsize = self._winsize
 
         self._winsize = self.window.getmaxyx()
-        if old_winsize != self._winsize or curses.is_term_resized(
-            *old_winsize
+        if (
+            screen is not None
+            or old_winsize != self._winsize
+            or curses.is_term_resized(*old_winsize)
         ):
             curses.resize_term(*self._winsize)
-            self._calc_x_positions()
+            if screen:
+                self.screen = screen
+
+            self.screen.enable(self)
+
+            if screen:
+                self._render(time.time())
 
     def start(self):
         self.enabled = True
@@ -99,7 +310,7 @@ class Display(object):
         self._color_pairs["n"] = curses.A_NORMAL
         window.refresh()
         self.window = window
-        self._refresh_winsize()
+        self._refresh_winsize(ProgStatsLayout())
 
         try:
             with util.stop_on_keyinterrupt():
@@ -120,6 +331,14 @@ class Display(object):
         char = self.window.getch()
         if char in (ord("Q"), ord("q")):
             self.stop()
+        elif char in (ord("P"), ord("p")):
+            self._refresh_winsize(ProgStatsLayout())
+        elif char in (ord("H"), ord("h")):
+            self._refresh_winsize(HostStatsLayout())
+        elif char in (ord("?"),):
+            self._refresh_winsize(KeyLayout())
+        elif char in (27,):
+            self.screen.press_escape(self)
         elif char == curses.KEY_RESIZE:
             # NOTE: this char breaks if you import readline, which
             # is implicit if you use Python cmd.Cmd() in its default
@@ -143,7 +362,7 @@ class Display(object):
 
     def _render_str(self, y, x, text, default_color="D", max_=None):
         if x < 0:
-            x = self._winsize[1] - len(_TEXT_RE.sub("", text))
+            x = self._winsize[1] - _text_width(text)
 
         current_color = dflt = self._get_color(default_color)
         if max_:
@@ -158,21 +377,14 @@ class Display(object):
                 else:
                     current_color = self._get_color(ccode)
             else:
-                self.window.addstr(y, x, token[: max_x - x], current_color)
+                try:
+                    self.window.addstr(y, x, token[: max_x - x], current_color)
+                except curses.error:
+                    pass
+
                 x += len(token)
                 if x > max_x:
                     break
-
-    def _render_row(self, row, y):
-        x_positions = iter(self._x_positions)
-        for elem, col in zip(row, self.columns):
-            cname, fmt, width, justify = col
-            if elem is None:
-                elem = ""
-            else:
-                elem = fmt % (elem,)
-            x, charwidth = next(x_positions)
-            self._render_str(y, x, elem, max_=charwidth - 1)
 
     def _render(self, now):
         self.window.erase()
@@ -180,86 +392,12 @@ class Display(object):
         service_str = self.service_str
 
         self._render_str(0, 0, "#Bb&[Connmon]#Dn& %s" % (service_str,))
-        self._render_str(0, -1, "#D&Commands: #Y&(Q)#D&uit")
-
         self._render_str(
-            2,
             0,
-            "#Mb&Hosts: #Dn&[%d curr / %d max]  "
-            "#Mb&Processes: #Dn&[%d curr / %d max]  "
-            % (
-                self.stat.host_count,
-                self.stat.max_host_count,
-                self.stat.process_count,
-                self.stat.max_process_count,
-            ),
-            "Wb",
-        )
-        self._render_str(
-            3,
-            0,
-            "#Mb&Connections: #Dn&[%d curr / %d max]  "
-            "#Mb&Checkouts: #Dn&[%d curr / %d max / %s]"
-            % (
-                self.stat.connection_count,
-                self.stat.max_connections,
-                self.stat.checkout_count,
-                self.stat.max_checkedout,
-                ("%.2f / sec" % self.stat.checkouts_per_second)
-                if self.stat.checkouts_per_second is not None
-                else "<calc>",
-            ),
-            "Wb",
+            -1,
+            "#D&Commands: #Y&(H)#D&ost stats #Y&(P)#D&rogram stats #Y&(?)#D&Legend #Y&(Q)#D&uit",
         )
 
-        top = 6
+        self.screen.render(self, now)
 
-        x_positions = iter(self._x_positions)
-        for col in self.columns:
-            cname, fmt, width, justify = col
-            x, charwidth = next(x_positions)
-            self._render_str(top, x, cname, "Cb")
-
-        rows = []
-        hostprogs = list(self.stat.hostprogs.values())
-        hostprogs.sort(
-            key=lambda hostprog: (hostprog.hostname, hostprog.progname)
-        )
-        for hostprog in hostprogs:
-            is_connected = bool(hostprog.process_count)
-            last_metric = hostprog.last_metric(now)
-            rows.append(
-                (
-                    "#%s&%s"
-                    % ("G" if is_connected else "R", hostprog.hostname),
-                    "#%s&%s"
-                    % ("G" if is_connected else "R", hostprog.progname),
-                    "#%s&%d/%d"
-                    % (
-                        "G" if last_metric <= hostprog.interval + 5 else "R",
-                        last_metric,
-                        hostprog.interval,
-                    ),
-                    hostprog.process_count,
-                    hostprog.connection_count,
-                    "%s/%s"
-                    % (
-                        ("%d" % hostprog.checkout_count)
-                        if hostprog.checkout_count is not None
-                        else "",
-                        ("%d" % hostprog.last_checkouts)
-                        if hostprog.last_checkouts is not None
-                        else "",
-                    ),
-                    hostprog.max_process_count,
-                    hostprog.max_connections,
-                    hostprog.max_checkedout,
-                    ("%.2f" % hostprog.checkouts_per_second)
-                    if hostprog.checkouts_per_second is not None
-                    else "<calc>",
-                )
-            )
-
-        for y, row in enumerate(rows, top + 1):
-            self._render_row(row, y)
         self.window.refresh()
