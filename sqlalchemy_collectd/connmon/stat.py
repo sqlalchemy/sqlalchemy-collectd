@@ -7,20 +7,53 @@ import time
 class HostProg(object):
     def __init__(self, hostname, progname):
         self.last_time = 0
+
+        # hostname where stats came from
         self.hostname = hostname
+
+        # progname marked on the stat
         self.progname = progname
 
+        # pool_internal.checkedout
+        self.checkout_count = None
+
+        # max of pool_internal.checkedout
+        self.max_checkedout = 0
+
+        # process_internal.numprocs
+        self.process_count = None
+
+        # max of pool_internal.numprocs
+        self.max_process_count = 0
+
+        # pool_internal.connections
+        self.connection_count = None
+
+        # max of pool_internal.connections
+        self.max_connections = 0
+
+        # totals_internal.connects
+        self.total_connects = None
+
+        # totals_internal.connects growth over last interval
+        self.interval_connects = None
+
+        # totals_internal.checkouts
         self.total_checkouts = None
+
+        # previous value of totals_internal.checkouts
         self.last_checkouts = None
+
+        # totals_internal.checkouts growth over last interval
+        self.interval_checkouts = None
+
+        # timestamp where we last got totals_internal.checkouts
         self.last_total_checkout_time = None
 
-        self.process_count = None
-        self.connection_count = None
-        self.checkout_count = None
-        self.max_process_count = 0
-        self.max_connections = 0
-        self.max_checkedout = 0
+        # calculated checkouts per second
         self.checkouts_per_second = None
+
+        # last interval received
         self.interval = 0
 
     def last_metric(self, now):
@@ -67,20 +100,28 @@ def update_connection_count(values_obj, value, hostprog):
     )
 
 
+@updates("connects")
+def update_total_connects(values_obj, value, hostprog):
+    if hostprog.total_connects is not None:
+        hostprog.interval_connects = value - hostprog.total_connects
+    hostprog.total_connects = value
+
+
 @updates("checkouts")
 def update_total_checkouts(values_obj, value, hostprog):
     total_checkouts = value
 
     if hostprog.last_total_checkout_time:
 
-        hostprog.last_checkouts = total_checkouts - hostprog.total_checkouts
+        hostprog.interval_checkouts = (
+            total_checkouts - hostprog.total_checkouts
+        )
         time_delta = values_obj.time - hostprog.last_total_checkout_time
 
         if time_delta >= values_obj.interval and hostprog.total_checkouts > 0:
             hostprog.checkouts_per_second = (
-                hostprog.last_checkouts
+                hostprog.interval_checkouts
             ) / time_delta
-
     hostprog.total_checkouts = total_checkouts
     hostprog.last_total_checkout_time = values_obj.time
 
@@ -99,6 +140,7 @@ class Stat(object):
         self.max_checkedout = 0
         self.checkouts_per_second = None
         self.hostprogs = {}
+        self.hosts = {}
 
     def start(self):
         self.worker = threading.Thread(target=self._wrap_update)
@@ -110,12 +152,18 @@ class Stat(object):
         self.process.start()
 
     def _get_hostprog(self, hostname, progname):
-        if (hostname, progname) not in self.hostprogs:
-            self.hostprogs[(hostname, progname)] = hostprog = HostProg(
-                hostname, progname
-            )
+        if progname is None or progname == "host":
+            if hostname not in self.hosts:
+                self.hosts[hostname] = hostprog = HostProg(hostname, None)
+            else:
+                hostprog = self.hosts[hostname]
         else:
-            hostprog = self.hostprogs[(hostname, progname)]
+            if (hostname, progname) not in self.hostprogs:
+                self.hostprogs[(hostname, progname)] = hostprog = HostProg(
+                    hostname, progname
+                )
+            else:
+                hostprog = self.hostprogs[(hostname, progname)]
         return hostprog
 
     def _process_hostprogs(self):
@@ -157,9 +205,6 @@ class Stat(object):
 
         hostname = values_obj.host
         progname = values_obj.plugin_instance
-
-        if progname == "host":
-            return
 
         hostprog = self._get_hostprog(hostname, progname)
 
