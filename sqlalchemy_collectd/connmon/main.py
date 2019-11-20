@@ -7,7 +7,7 @@ from ..server import listener
 from ..server import receiver
 
 
-def main(argv=[]):
+def main(argv=None):
     parser = argparse.ArgumentParser()
 
     parser.add_argument(

@@ -1,0 +1,6 @@
+.. change::
+    :tags: bug
+    :tickets: 7
+
+    Fixed bug where the command line options to connmon didn't work due to
+    incorrect argument signature for the main() function.
