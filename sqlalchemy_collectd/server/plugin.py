@@ -41,7 +41,7 @@ def start_plugin(config):
     if monitor_host is not None and monitor_port is not None:
         from sqlalchemy_collectd.connmon import plugin as connmon
 
-        collectd.warning(
+        log.warn(
             "the connmon plugin should now be configured separately in its "
             "own <Module> section"
         )
