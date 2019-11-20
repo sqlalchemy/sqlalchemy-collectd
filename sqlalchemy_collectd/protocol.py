@@ -2,14 +2,10 @@
 connect straight to the network plugin.
 
 """
-import collections
-import logging
 import os
 import socket
 import struct
 import threading
-
-log = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL = 10
 MAX_PACKET_SIZE = 1024
@@ -79,11 +75,6 @@ class Type(object):
                 ("longterm", VALUE_GAUGE)
             )
 
-        note: for all the great effort here in working up types,
-        collectd aggregation plugin doesn't support more than one dsvalue
-        at a time in a record so all this flexibility is all a waste of
-        time :(
-
         """
         self.name = name
         self._field_names = [dsname for dsname, value_type in db_template]
@@ -119,134 +110,167 @@ class Type(object):
         return msg
 
 
-class MessageSender(object):
-    """Represents all the fields necessary to send a message."""
+class Values(object):
+    """A mirror object of collectd.Values"""
 
     __slots__ = (
         "type",
-        "host",
+        "type_instance",
         "plugin",
         "plugin_instance",
-        "type_instance",
+        "host",
+        "time",
         "interval",
-        "_host_message_part",
-        "_remainder_message_parts",
+        "values",
     )
 
-    def __init__(
-        self,
-        type_,
-        host,
-        plugin,
-        plugin_instance=None,
-        type_instance=None,
-        interval=DEFAULT_INTERVAL,
-    ):
+    def __init__(self, **kw):
+        # TODO: see what new python 3 values objects or what can help
+        # with this
+        for k in self.__slots__:
+            setattr(self, k, kw[k] if k in kw else None)
+        if self.interval is None:
+            self.interval = DEFAULT_INTERVAL
 
-        self.type = type_
-        self.host = host
-        self.plugin = plugin
-        self.plugin_instance = plugin_instance
-        self.type_instance = type_instance
-        self.interval = interval
+    def _asdict(self, omit_none=False):
+        return {
+            k: getattr(self, k)
+            for k in self.__slots__
+            if not omit_none or getattr(self, k) is not None
+        }
 
-        self._host_message_part = self._pack_string(TYPE_HOST, self.host)
-        self._remainder_message_parts = (
-            self._pack_string(TYPE_PLUGIN, self.plugin)
-            + self._pack_string(TYPE_PLUGIN_INSTANCE, self.plugin_instance)
-            + self._pack_string(TYPE_TYPE, self.type.name)
-            + struct.pack("!HHq", TYPE_INTERVAL, 12, self.interval)
-            + self._pack_string(TYPE_TYPE_INSTANCE, self.type_instance)
+    def build(self, **kw):
+        d = self._asdict()
+        d.update(kw)
+        return Values(**d)
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __add__(self, other):
+        """Sum the data values of this Values against another."""
+
+        if not isinstance(other, Values):
+            other_values = [other for v in self.values]
+            _reverse_coalesce = {}
+        else:
+            other_values = other.values
+            _reverse_coalesce = {
+                k: None
+                for k in [
+                    "type_instance",
+                    "host",
+                    "time",
+                    "interval",
+                    "plugin_instance",
+                    "plugin",
+                    "type",
+                ]
+                if getattr(self, k) != getattr(other, k)
+            }
+
+        return self.build(
+            values=[v + o for v, o in zip(self.values, other_values)],
+            **_reverse_coalesce
         )
 
+    def __eq__(self, other):
+        if not isinstance(other, Values):
+            return False
+
+        return [getattr(self, k) for k in self.__slots__] == [
+            getattr(other, k) for k in self.__slots__
+        ]
+
+    @classmethod
+    def from_collectd_values(cls, cd_values_obj, log):
+        log.debug("receive[collectd process] -> %r", cd_values_obj)
+
+        return cls(
+            type=cd_values_obj.type,
+            type_instance=cd_values_obj.type_instance,
+            plugin=cd_values_obj.plugin,
+            plugin_instance=cd_values_obj.plugin_instance,
+            host=cd_values_obj.host,
+            time=cd_values_obj.time,
+            interval=cd_values_obj.interval,
+            values=cd_values_obj.values,
+        )
+
+    def send_to_collectd(self, collectd, log, use_configured_interval=True):
+        data = self._asdict(omit_none=True)
+        if use_configured_interval:
+            # https://collectd.org/documentation/
+            # manpages/collectd-python.5.shtml#configuration
+            # "If this member is set to a non-positive value, the default
+            # value as specified in the config file will be used
+            # (default: 10)."  - hint - they mean zero
+            data["interval"] = 0
+        v = collectd.Values(**data)
+        log.debug("send[collectd process] -> %r", v)
+        v.dispatch()
+
+    def __repr__(self):
+        return "sqlalchemy_collectd.Values(%s)" % (
+            ", ".join("%s=%r" % (k, getattr(self, k)) for k in self.__slots__),
+        )
+
+
+class NetworkSender(object):
+    def __init__(self, connection, types):
+        self._types = {type_.name: type_ for type_ in types}
+        self._senders = {}
+        self.connection = connection
+        self.log = connection.log
+
+    def send(self, values_obj):
+        connection = self.connection
+        timestamp = values_obj.time
+        type_name = values_obj.type
+
+        try:
+            type_obj = self._types[type_name]
+        except KeyError:
+            raise TypeError("don't know type: %s" % type_name)
+
+        _pack_string = self._pack_string
+        _host_message_part = _pack_string(TYPE_HOST, values_obj.host)
+        _remainder_message_parts = (
+            _pack_string(TYPE_PLUGIN, values_obj.plugin)
+            + _pack_string(TYPE_PLUGIN_INSTANCE, values_obj.plugin_instance)
+            + _pack_string(TYPE_TYPE, type_obj.name)
+            + struct.pack("!HHq", TYPE_INTERVAL, 12, int(values_obj.interval))
+            + _pack_string(TYPE_TYPE_INSTANCE, values_obj.type_instance)
+        )
+        header_ = (
+            _host_message_part
+            + header.pack(TYPE_TIME, 12)
+            + long_.pack(int(timestamp))
+            + _remainder_message_parts
+        )
+
+        payload = type_obj._encode_values(*values_obj.values)
+
+        self.log.debug(
+            "send[UDP:%s:%s] -> %s",
+            connection.host,
+            connection.port,
+            values_obj,
+        )
+        connection.send(header_ + payload)
+
     def _pack_string(self, typecode, value):
+        value = value or ""
         return (
             header.pack(typecode, 5 + len(value))
             + value.encode("ascii")
             + b"\0"
         )
 
-    def send(self, connection, timestamp, *values):
-        """Send a message on a connection."""
 
-        header_ = (
-            self._host_message_part
-            + header.pack(TYPE_TIME, 12)
-            + long_.pack(int(timestamp))
-            + self._remainder_message_parts
-        )
-
-        payload = self.type._encode_values(*values)
-
-        log.debug("send: %s", _SendMsg(self, values))
-        connection.send(header_ + payload)
-
-    def __str__(self):
-        return (
-            "(host=%r, plugin=%r, plugin_instance=%r, "
-            "type=%r, type_instance=%r, interval=%r)"
-            % (
-                self.host,
-                self.plugin,
-                self.plugin_instance,
-                self.type.name,
-                self.type_instance,
-                self.interval,
-            )
-        )
-
-
-class _SendMsg(collections.namedtuple("sendmsg", ["sender", "values"])):
-    def __str__(self):
-        sender = self.sender
-        type_ = sender.type
-        return (
-            "(host=%r, plugin=%r, plugin_instance=%r, "
-            "type=%r, type_instance=%r, interval=%r, values=%s)"
-            % (
-                sender.host,
-                sender.plugin,
-                sender.plugin_instance,
-                type_.name,
-                sender.type_instance,
-                sender.interval,
-                ", ".join(
-                    "%s=%s" % (field_name, value)
-                    for field_name, value in zip(type_.names, self.values)
-                ),
-            )
-        )
-
-
-class _RecvMsg(collections.namedtuple("receivemsg", ["result", "type"])):
-    def __str__(self):
-        if self.type:
-            type_names = self.type.names
-        else:
-            type_names = ["(unknown)" for value in self.result[TYPE_VALUES]]
-
-        return (
-            "(host=%r, plugin=%r, plugin_instance=%r, "
-            "type=%r, type_instance=%r, interval=%r, values=%s)"
-            % (
-                self.result[TYPE_HOST],
-                self.result[TYPE_PLUGIN],
-                self.result[TYPE_PLUGIN_INSTANCE],
-                self.result[TYPE_TYPE],
-                self.result[TYPE_TYPE_INSTANCE],
-                self.result[TYPE_INTERVAL],
-                ", ".join(
-                    "%s=%s" % (field_name, value)
-                    for field_name, value in zip(
-                        type_names, self.result[TYPE_VALUES]
-                    )
-                ),
-            )
-        )
-
-
-class MessageReceiver(object):
-    def __init__(self, *types):
+class NetworkReceiver(object):
+    def __init__(self, connection, types):
+        self.connection = connection
         self._receivers = {
             TYPE_HOST: self._unpack_string,
             TYPE_TIME: self._unpack_long,
@@ -258,30 +282,45 @@ class MessageReceiver(object):
             TYPE_INTERVAL: self._unpack_long,
         }
         self._types = {type_.name: type_ for type_ in types}
+        self.log = connection.log
 
-    def receive(self, buf):
+    def receive(self):
+        connection = self.connection
+        buf, host_ = connection.receive()
         result = self._unpack_packet(buf)
         try:
             type_name = result[TYPE_TYPE]
         except KeyError:
-            log.warn("Message did not have TYPE_TYPE block, skipping")
+            self.log.warn("Message did not have TYPE_TYPE block, skipping")
             return None
 
-        type_ = None
         try:
-            type_ = self._types[type_name]
+            self._types[type_name]
         except KeyError:
-            log.warn("Type %s not known, skipping", type_name)
+            self.log.warn("Type %s not known, skipping", type_name)
             return None
         else:
-            result["type"] = type_
-            result["values"] = {
-                name: value
-                for name, value in zip(type_._field_names, result[TYPE_VALUES])
-            }
-            return result
+            value = self._to_value(result)
+            return value
         finally:
-            log.debug("receive: %s", _RecvMsg(result, type_))
+            self.log.debug(
+                "receive[UDP:%s:%s] -> %s",
+                connection.host,
+                connection.port,
+                value,
+            )
+
+    def _to_value(self, result):
+        return Values(
+            host=result[TYPE_HOST],
+            time=result[TYPE_TIME],
+            plugin=result[TYPE_PLUGIN],
+            plugin_instance=result[TYPE_PLUGIN_INSTANCE],
+            type=result[TYPE_TYPE],
+            type_instance=result[TYPE_TYPE_INSTANCE],
+            values=result[TYPE_VALUES],
+            interval=result[TYPE_INTERVAL],
+        )
 
     def _unpack_packet(self, buf):
         pos = 0
@@ -293,7 +332,7 @@ class MessageReceiver(object):
             try:
                 fn = self._receivers[type_]
             except KeyError:
-                log.warn("Message %s not known, skipping", type_)
+                self.log.warn("Message %s not known, skipping", type_)
             else:
                 value = fn(type_, len_, buf[pos:])
 
@@ -321,13 +360,27 @@ class MessageReceiver(object):
         return result
 
 
+class ServerConnection(object):
+    def __init__(self, host, port, log):
+        self.host = host
+        self.port = port
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind((host, port))
+        self.log = log
+
+    def receive(self):
+        data, addr = self.sock.recvfrom(1024)
+        return data, addr
+
+
 class ClientConnection(object):
     connections = {}
     create_mutex = threading.Lock()
 
-    def __init__(self, host="localhost", port=25826):
+    def __init__(self, host, port, log):
         self.host = host
         self.port = port
+        self.log = log
         self._mutex = threading.Lock()
         self.socket = None
         self.pid = None
@@ -338,13 +391,13 @@ class ClientConnection(object):
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     @classmethod
-    def for_host_port(cls, host, port):
+    def for_host_port(cls, host, port, log):
         cls.create_mutex.acquire()
         try:
             key = (host, port)
             if key not in cls.connections:
                 cls.connections[key] = connection = ClientConnection(
-                    host, port
+                    host, port, log
                 )
                 return connection
             else:
@@ -359,18 +412,6 @@ class ClientConnection(object):
             self._check_connect()
             self.socket.sendto(message, (self.host, self.port))
         except IOError:
-            log.error("Error in socket.sendto", exc_info=True)
+            self.log.error("Error in socket.sendto", exc_info=True)
         finally:
             self._mutex.release()
-
-
-class ServerConnection(object):
-    def __init__(self, host, port):
-        self.host = host
-        self.port = port
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind((host, port))
-
-    def receive(self):
-        data, addr = self.sock.recvfrom(1024)
-        return data, addr

@@ -1,37 +1,108 @@
+from __future__ import absolute_import
+
+import itertools
 import logging
 
-from . import aggregator
+from .. import internal_types
 from .. import protocol
-from ..client import internal_types
+from .. import stream
 
 log = logging.getLogger(__name__)
 
 
 class Receiver(object):
-    def __init__(self, plugin="sqlalchemy"):
+    def __init__(
+        self, host, port, log, plugin=internal_types.COLLECTD_PLUGIN_NAME
+    ):
+        self.log = log
         self.plugin = plugin
-        self.internal_types = [internal_types.pool, internal_types.totals]
-        self.message_receiver = protocol.MessageReceiver(*self.internal_types)
-
-        self.aggregator = aggregator.Aggregator(
-            [type_.name for type_ in self.internal_types]
+        self.internal_types = [
+            internal_types.pool_internal,
+            internal_types.totals_internal,
+            internal_types.process_internal,
+        ]
+        self.network_receiver = protocol.NetworkReceiver(
+            protocol.ServerConnection(host, port, log), self.internal_types
         )
+        self.translator = stream.StreamTranslator(*self.internal_types)
+        self.bucket_names = [t.name for t in self.internal_types]
+        self.buckets = {
+            name: stream.TimeBucket() for name in self.bucket_names
+        }
 
-        self.monitors = []
+    def receive(self):
+        values_obj = self.network_receiver.receive()
+        self._set_stats(values_obj)
 
-    def receive(self, connection):
-        data, host_ = connection.receive()
-        for monitor in self.monitors:
-            monitor.forward(data)
+    def summarize(self, collectd, timestamp):
+        for type_ in self.internal_types:
+            for values_obj in self.get_stats_by_progname(
+                type_.name, timestamp
+            ):
+                for (
+                    external_values_obj
+                ) in self.translator.break_into_individual_values(values_obj):
+                    external_values_obj.send_to_collectd(collectd, self.log)
 
-        message = self.message_receiver.receive(data)
-        type_name = message[protocol.TYPE_TYPE]
-        timestamp = message[protocol.TYPE_TIME]
-        host = message[protocol.TYPE_HOST]
-        progname = message[protocol.TYPE_PLUGIN_INSTANCE]
-        values = message[protocol.TYPE_VALUES]
-        pid = message[protocol.TYPE_TYPE_INSTANCE]
-        interval = message[protocol.TYPE_INTERVAL]
-        self.aggregator.set_stats(
-            type_name, host, progname, pid, timestamp, values, interval
-        )
+            for values_obj in self.get_stats_by_hostname(
+                type_.name, timestamp
+            ):
+                for (
+                    external_values_obj
+                ) in self.translator.break_into_individual_values(values_obj):
+                    external_values_obj.send_to_collectd(collectd, self.log)
+
+    def _set_stats(self, values):
+        bucket_name = values.type
+        timestamp = values.time
+        hostname = values.host
+        progname = values.plugin_instance
+        pid = values.type_instance
+        interval = values.interval
+
+        bucket = self.buckets[bucket_name]
+        records = bucket.get_data(timestamp, interval=interval * 2)
+
+        records[(hostname, progname, pid)] = values
+
+        if pid:
+            # manufacture a record for that is a single process count for this
+            # pid. we also use a larger interval
+            # for this value so that the process count changes more slowly
+            process_bucket = self.buckets[internal_types.process_internal.name]
+            process_records = process_bucket.get_data(
+                timestamp, interval=interval * 5
+            )
+            process_records[(hostname, progname, pid)] = values.build(
+                type=internal_types.process_internal.name, values=[1]
+            )
+
+    def get_stats_by_progname(self, bucket_name, timestamp, agg_func=sum):
+        bucket = self.buckets[bucket_name]
+        records = bucket.get_data(timestamp)
+
+        for (hostname, progname), keys in itertools.groupby(
+            sorted(records), key=lambda rec: (rec[0], rec[1])
+        ):
+            recs = [records[key] for key in keys]
+            interval = recs[0].interval
+            # summation here is across pids.
+            # if records are pid-less, then there would be one record
+            # per host/program name.
+            values_obj = agg_func(recs).build(
+                time=timestamp, interval=interval
+            )
+            yield values_obj
+
+    def get_stats_by_hostname(self, bucket_name, timestamp, agg_func=sum):
+        bucket = self.buckets[bucket_name]
+        records = bucket.get_data(timestamp)
+        for hostname, keys in itertools.groupby(
+            sorted(records), key=lambda rec: rec[0]
+        ):
+            recs = [records[key] for key in keys]
+            interval = recs[0].interval
+            values_obj = agg_func(recs).build(
+                plugin_instance="host", time=timestamp, interval=interval
+            )
+            yield values_obj

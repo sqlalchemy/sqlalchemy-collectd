@@ -1,4 +1,6 @@
-from . import internal_types
+import threading
+
+from .. import internal_types
 from .. import protocol
 
 
@@ -14,47 +16,82 @@ def sends(protocol_type):
 
 
 class Sender(object):
-    def __init__(self, hostname, stats_name, plugin="sqlalchemy"):
+    senders = {}
+    create_mutex = threading.Lock()
+
+    def __init__(
+        self,
+        hostname,
+        stats_name,
+        collectd_host,
+        collectd_port,
+        log,
+        plugin=internal_types.COLLECTD_PLUGIN_NAME,
+    ):
         self.hostname = hostname
         self.stats_name = stats_name
         self.plugin = plugin
+        self.message_sender = protocol.NetworkSender(
+            protocol.ClientConnection.for_host_port(
+                collectd_host, collectd_port, log
+            ),
+            [protocol_type for protocol_type, sender in senders],
+        )
 
-    def send(self, connection, collection_target, timestamp, interval, pid):
+    def send(self, collection_target, timestamp, interval, pid):
+        values = protocol.Values(
+            host=self.hostname,
+            plugin=self.plugin,
+            plugin_instance=self.stats_name,
+            type_instance=str(pid),
+            interval=interval,
+            time=timestamp,
+        )
         for protocol_type, sender in senders:
-            message_sender = protocol.MessageSender(
-                protocol_type,
-                self.hostname,
-                self.plugin,
-                plugin_instance=self.stats_name,
-                type_instance=str(pid),
-                interval=interval,
-            )
-            sender(message_sender, connection, collection_target, timestamp)
+            self.message_sender.send(sender(values, collection_target))
+
+    @classmethod
+    def get_sender(
+        cls, hostname, stats_name, collectd_host, collectd_port, log
+    ):
+        cls.create_mutex.acquire()
+        try:
+            key = (hostname, stats_name, collectd_host, collectd_port)
+            if key not in cls.senders:
+                sender = cls.senders[key] = Sender(
+                    hostname, stats_name, collectd_host, collectd_port, log
+                )
+                return sender
+            else:
+                return cls.senders[key]
+
+        finally:
+            cls.create_mutex.release()
 
 
-@sends(internal_types.pool)
-def _send_pool(message_sender, connection, collection_target, timestamp):
-    message_sender.send(
-        connection,
-        timestamp,
-        collection_target.num_pools,
-        collection_target.num_checkedout,
-        collection_target.num_checkedin,
-        collection_target.num_detached,
-        # collection_target.num_invalidated,
-        collection_target.num_connections,
+@sends(internal_types.pool_internal)
+def _send_pool(values, collection_target):
+    return values.build(
+        type=internal_types.pool_internal.name,
+        values=[
+            collection_target.num_pools,
+            collection_target.num_checkedout,
+            collection_target.num_checkedin,
+            collection_target.num_detached,
+            # collection_target.num_invalidated,
+            collection_target.num_connections,
+        ],
     )
 
 
-@sends(internal_types.totals)
-def _send_connection_totals(
-    message_sender, connection, collection_target, timestamp
-):
-    message_sender.send(
-        connection,
-        timestamp,
-        collection_target.total_checkouts,
-        collection_target.total_invalidated,
-        collection_target.total_connects,
-        collection_target.total_disconnects,
+@sends(internal_types.totals_internal)
+def _send_connection_totals(values, collection_target):
+    return values.build(
+        type=internal_types.totals_internal.name,
+        values=[
+            collection_target.total_checkouts,
+            collection_target.total_invalidated,
+            collection_target.total_connects,
+            collection_target.total_disconnects,
+        ],
     )

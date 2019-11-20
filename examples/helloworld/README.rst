@@ -11,9 +11,9 @@ In one terminal window, run collectd as an interactive application with
 the -f flag::
 
     # cd examples/helloworld
-    # collectd -f -C collectdconsole.conf
+    # collectd -f -C client_plus_connmon.conf
 
-The ``collectdconsole.conf`` includes a relative path to the
+The ``client_plus_connmon.conf`` file includes a relative path to the
 sqlalchemy-collectd checkout as the module path.
 
 Step Two - Run the demo program
@@ -29,7 +29,7 @@ Step Three - watch collectd console
 
 Output looks something like::
 
-    $ collectd -f -C collectdconsole.conf
+    $ collectd -f -C client_plus_connmon.conf
     [2018-02-11 18:29:35] plugin_load: plugin "logfile" successfully loaded.
     [2018-02-11 18:29:35] [info] plugin_load: plugin "write_log" successfully loaded.
     [2018-02-11 18:29:35] [info] plugin_load: plugin "python" successfully loaded.

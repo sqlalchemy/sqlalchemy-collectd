@@ -8,7 +8,7 @@ log = logging.getLogger(__name__)
 _WORKER_THREAD = None
 _PID = os.getpid()
 
-_collection_targets = []
+_collection_targets = {}
 
 
 def _check_threads_started():
@@ -31,17 +31,13 @@ def _process(interval):
         while True:
             now = time.time()
             for (
-                collection_target,
-                connection,
-                sender,
+                (collection_target, sender),
                 last_called,
-            ) in _collection_targets:
+            ) in _collection_targets.items():
                 if now - last_called[0] > interval:
                     last_called[0] = now
                     try:
-                        sender.send(
-                            connection, collection_target, now, interval, pid
-                        )
+                        sender.send(collection_target, now, interval, pid)
                     except Exception:
                         log.error("error sending stats", exc_info=True)
 
@@ -53,6 +49,7 @@ def _process(interval):
         )
 
 
-def add_target(connection, collection_target, sender):
-    _collection_targets.append((collection_target, connection, sender, [0]))
+def add_target(collection_target, sender):
+    if (collection_target, sender) not in _collection_targets:
+        _collection_targets[(collection_target, sender)] = [0]
     _check_threads_started()

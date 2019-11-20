@@ -10,15 +10,17 @@ class WorkerTest(unittest.TestCase):
     def test_worker_resilency(self):
         canary = mock.Mock()
 
-        collection_one = ["one", KeyError("random internal error"), "three"]
-        collection_two = ["one", "two", SystemExit()]
+        sender1 = mock.Mock(
+            collection=["one", KeyError("random internal error"), "three"]
+        )
+        sender2 = mock.Mock(collection=["one", "two", SystemExit()])
 
-        def send(collection, collection_target, now, interval, pid):
-            obj = collection.pop(0)
+        def send(sender, now, interval, pid):
+            obj = sender.collection.pop(0)
             if isinstance(obj, BaseException):
                 raise obj
             else:
-                canary.send(collection_target, obj)
+                canary.send(obj)
 
         the_time = [100]
 
@@ -47,15 +49,11 @@ class WorkerTest(unittest.TestCase):
                 # this adds the target and also starts the worker thread.
                 # however we have it blocked from doing anything via the
                 # mutex above...
-                worker.add_target(
-                    collection_one, "target one", mock.Mock(send=send)
-                )
+                worker.add_target(sender1, mock.Mock(send=send))
 
                 # ...so that we can also add this target and get deterministic
                 # results
-                worker.add_target(
-                    collection_two, "target two", mock.Mock(send=send)
-                )
+                worker.add_target(sender2, mock.Mock(send=send))
             finally:
                 # worker thread is unblocked
                 mutex.release()
@@ -67,10 +65,10 @@ class WorkerTest(unittest.TestCase):
         # see that it did what we asked.
         self.assertEqual(
             [
-                mock.call.send("target one", "one"),
-                mock.call.send("target two", "one"),
-                mock.call.send("target two", "two"),
-                mock.call.send("target one", "three"),
+                mock.call.send("one"),
+                mock.call.send("one"),
+                mock.call.send("two"),
+                mock.call.send("three"),
             ],
             canary.mock_calls,
         )

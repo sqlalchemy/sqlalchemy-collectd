@@ -185,16 +185,6 @@ if you are using gevent, eventlet, asyncio, gunicorn, etc.  threads are your
 friend).
 
 
-TODO
-^^^^
-
-We can add options so that stats are still grouped under parent pids, that
-is instead of using ``<progname>`` as the classifier we use
-``<progname>-<parentpid>``, like ``nova_api-15840`` vs. ``nova_api-4573``, etc.
-Of course we can report on the raw subprocess identifiers as well but this
-doesn't appear to be that useful.
-
-
 
 Server
 ------
@@ -434,8 +424,8 @@ As an added feature, the **connmon** UX has now been integrated into SQLAlchemy-
 This is a console application that displays a "top"-like display of the current
 status of connections.
 
-Using the configuration above, we can add a "monitor" line to our collectd
-server configuration::
+Using the configuration above, we can add a a plugin configuration for the
+connmon server plugin::
 
 
     LoadPlugin python
@@ -451,14 +441,28 @@ server configuration::
             # set to "debug" to show messages received
             loglevel "info"
 
-            # connmon monitor port
-            monitor "localhost" 25828
         </Module>
+
+        Import "sqlalchemy_collectd.connmon.plugin"
+        <Module "sqlalchemy_collectd.connmon.plugin">
+            monitor "localhost" 25828
+
+            # set to "debug" to show messaging
+            #loglevel "debug"
+        </Module>
+
     </Plugin>
 
 We can now run "connmon" on localhost port 25828::
 
     connmon --port 25828
+
+The connmon plugin and command line tool as of version 0.6 works independently
+of the "server" plugin, and may be configured by itself without the server
+plugin being present.  It now consumes sqlalchemy-collectd events not only from
+the local server plugin if present, but from also from any other
+sqlalchemy-collectd messages that are forwarded to the server from elsewhere,
+typically via the "network" plugin.
 
 Screenshot of connmon:
 

@@ -36,6 +36,80 @@ class CollectDProtocolTest(unittest.TestCase):
         b"\x00\x05\x00\x15sometypeinstance\x00"  # TYPE_TYPE_INSTANCE
     ) + value_block
 
+    def test_values_sum(self):
+        type_ = protocol.Type(
+            "my_type",
+            ("some_val", protocol.VALUE_GAUGE),
+            ("some_other_val", protocol.VALUE_DERIVE),
+        )
+
+        value = protocol.Values(
+            type="my_type",
+            host="somehost",
+            plugin="someplugin",
+            plugin_instance="someplugininstance",
+            type_instance="sometypeinstance",
+        )
+
+        self.assertEqual(
+            sum(
+                [
+                    value.build(values=[5, 10]),
+                    value.build(values=[25, 8]),
+                    value.build(values=[11, 7]),
+                ]
+            ),
+            value.build(values=[41, 25]),
+        )
+
+        # other fields that are different are removed
+        self.assertEqual(
+            sum(
+                [
+                    value.build(type_instance="one", values=[5, 10]),
+                    value.build(type_instance="two", values=[25, 8]),
+                    value.build(values=[11, 7]),
+                ]
+            ),
+            value.build(type_instance=None, values=[41, 25]),
+        )
+
+    def test_values_build(self):
+        value = protocol.Values(
+            type="my_type",
+            host="somehost",
+            plugin="someplugin",
+            plugin_instance="someplugininstance",
+            type_instance="sometypeinstance",
+            time=50,
+        )
+
+        v1 = value.build(time=60)
+        v2 = value.build(time=70)
+
+        self.assertEqual(
+            value,
+            protocol.Values(
+                type="my_type",
+                host="somehost",
+                plugin="someplugin",
+                plugin_instance="someplugininstance",
+                type_instance="sometypeinstance",
+                time=50,
+            ),
+        )
+        self.assertEqual(
+            v2,
+            protocol.Values(
+                type="my_type",
+                host="somehost",
+                plugin="someplugin",
+                plugin_instance="someplugininstance",
+                type_instance="sometypeinstance",
+                time=70,
+            ),
+        )
+
     def test_message_construct(self):
         type_ = protocol.Type(
             "my_type",
@@ -43,17 +117,18 @@ class CollectDProtocolTest(unittest.TestCase):
             ("some_other_val", protocol.VALUE_DERIVE),
         )
 
-        sender = protocol.MessageSender(
-            type_,
-            "somehost",
-            "someplugin",
-            "someplugininstance",
-            "sometypeinstance",
+        value = protocol.Values(
+            type="my_type",
+            host="somehost",
+            plugin="someplugin",
+            plugin_instance="someplugininstance",
+            type_instance="sometypeinstance",
         )
 
         connection = mock.Mock()
 
-        sender.send(connection, 1517607042.95968, 25.809, 450)
+        sender = protocol.NetworkSender(connection, [type_])
+        sender.send(value.build(time=1517607042.95968, values=[25.809, 450]))
 
         self.assertEqual([mock.call(self.message)], connection.send.mock_calls)
 
@@ -64,21 +139,22 @@ class CollectDProtocolTest(unittest.TestCase):
             ("some_other_val", protocol.VALUE_DERIVE),
         )
 
-        message_receiver = protocol.MessageReceiver(type_)
-        result = message_receiver.receive(self.message)
+        connection = mock.Mock(
+            receive=mock.Mock(return_value=(self.message, "localhost"))
+        )
+        network_receiver = protocol.NetworkReceiver(connection, [type_])
+        result = network_receiver.receive()
         self.assertEqual(
-            {
-                protocol.TYPE_HOST: "somehost",
-                protocol.TYPE_TIME: 1517607042,
-                protocol.TYPE_PLUGIN: "someplugin",
-                protocol.TYPE_PLUGIN_INSTANCE: "someplugininstance",
-                protocol.TYPE_TYPE: "my_type",
-                protocol.TYPE_TYPE_INSTANCE: "sometypeinstance",
-                protocol.TYPE_VALUES: [25.809, 450],
-                protocol.TYPE_INTERVAL: 10,
-                "type": type_,
-                "values": {"some_other_val": 450, "some_val": 25.809},
-            },
+            protocol.Values(
+                type="my_type",
+                host="somehost",
+                plugin="someplugin",
+                plugin_instance="someplugininstance",
+                type_instance="sometypeinstance",
+                values=[25.809, 450],
+                interval=10,
+                time=1517607042,
+            ),
             result,
         )
 
@@ -89,9 +165,16 @@ class CollectDProtocolTest(unittest.TestCase):
             ("some_other_val", protocol.VALUE_DERIVE),
         )
 
-        message_receiver = protocol.MessageReceiver(type_)
-        with mock.patch.object(protocol, "log") as log:
-            result = message_receiver.receive(b"asdfjq34kt2n34kjnas")
+        log = mock.Mock()
+        connection = mock.Mock(
+            receive=mock.Mock(
+                return_value=(b"asdfjq34kt2n34kjnas", "localhost")
+            ),
+            log=log,
+        )
+        network_receiver = protocol.NetworkReceiver(connection, [type_])
+
+        result = network_receiver.receive()
         self.assertEqual(result, None)
         self.assertEqual(
             log.mock_calls,

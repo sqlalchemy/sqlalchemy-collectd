@@ -22,20 +22,21 @@ _TEXT_RE = re.compile(r"(#.+?)&", re.M)
 
 
 class Display(object):
-    def __init__(self, stat, connection):
+    def __init__(self, stat, service_str):
         self.columns = [
             ("hostname (#R&[dis]#G&connected#d&)", "%s", 0.18, "L"),
             ("progname", "%s", 0.20, "R"),
+            ("last", "%s", 0.08, "R"),
             ("nproc", "%d", 0.08, "R"),
             ("conn", "%d", 0.08, "R"),
-            ("ckout", "%d", 0.08, "R"),
+            ("ckout", "%s", 0.08, "R"),
             ("maxnproc", "%d", 0.08, "R"),
             ("maxconn", "%d", 0.08, "R"),
             ("maxckout", "%d", 0.08, "R"),
             ("ckoutpersec", "%s", 0.08, "R"),
         ]
         self.stat = stat
-        self.connection = connection
+        self.service_str = service_str
 
         self._winsize = None
         self._x_positions = None
@@ -110,8 +111,9 @@ class Display(object):
         render_timer = util.periodic_timer(0.5)
         while self.enabled:
             time.sleep(0.1)
-            if render_timer(time.time()):
-                self._render()
+            now = time.time()
+            if render_timer(now):
+                self._render(now)
             self._handle_cmds()
 
     def _handle_cmds(self):
@@ -165,17 +167,17 @@ class Display(object):
         x_positions = iter(self._x_positions)
         for elem, col in zip(row, self.columns):
             cname, fmt, width, justify = col
-            elem = fmt % (elem,)
+            if elem is None:
+                elem = ""
+            else:
+                elem = fmt % (elem,)
             x, charwidth = next(x_positions)
             self._render_str(y, x, elem, max_=charwidth - 1)
 
-    def _render(self):
+    def _render(self, now):
         self.window.erase()
 
-        service_str = "[Direct host: %s:%s]" % (
-            self.connection.host,
-            self.connection.port,
-        )
+        service_str = self.service_str
 
         self._render_str(0, 0, "#Bb&[Connmon]#Dn& %s" % (service_str,))
         self._render_str(0, -1, "#D&Commands: #Y&(Q)#D&uit")
@@ -225,15 +227,30 @@ class Display(object):
         )
         for hostprog in hostprogs:
             is_connected = bool(hostprog.process_count)
+            last_metric = hostprog.last_metric(now)
             rows.append(
                 (
                     "#%s&%s"
                     % ("G" if is_connected else "R", hostprog.hostname),
                     "#%s&%s"
                     % ("G" if is_connected else "R", hostprog.progname),
+                    "#%s&%d/%d"
+                    % (
+                        "G" if last_metric <= hostprog.interval + 5 else "R",
+                        last_metric,
+                        hostprog.interval,
+                    ),
                     hostprog.process_count,
                     hostprog.connection_count,
-                    hostprog.checkout_count,
+                    "%s/%s"
+                    % (
+                        ("%d" % hostprog.checkout_count)
+                        if hostprog.checkout_count is not None
+                        else "",
+                        ("%d" % hostprog.last_checkouts)
+                        if hostprog.last_checkouts is not None
+                        else "",
+                    ),
                     hostprog.max_process_count,
                     hostprog.max_connections,
                     hostprog.max_checkedout,

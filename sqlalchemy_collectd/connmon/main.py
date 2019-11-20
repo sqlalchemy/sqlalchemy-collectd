@@ -1,10 +1,14 @@
+from __future__ import absolute_import
+
 import argparse
+import logging
 
 from . import display
 from . import stat
+from .. import internal_types
 from .. import protocol
-from ..server import listener
-from ..server import receiver
+
+log = logging.getLogger(__name__)
 
 
 def main(argv=None):
@@ -24,17 +28,30 @@ def main(argv=None):
     )
     options = parser.parse_args(argv)
 
-    receiver_ = receiver.Receiver()
+    network_receiver = protocol.NetworkReceiver(
+        protocol.ServerConnection(options.host, options.port, log),
+        [internal_types.count_external, internal_types.derive_external],
+    )
 
-    connection = protocol.ServerConnection(options.host, options.port)
-
-    listener.listen(connection, receiver_)
-
-    stat_ = stat.Stat(receiver_.aggregator)
+    stat_ = stat.Stat(network_receiver, log)
     stat_.start()
 
-    display_ = display.Display(stat_, connection)
+    service_str = "[Direct host: %s:%s]" % (options.host, options.port)
+
+    # _dummy_wait()
+    display_ = display.Display(stat_, service_str)
     display_.start()
+
+
+def _dummy_wait():
+    import time
+    import logging
+
+    # logging.basicConfig()
+    log.setLevel(logging.DEBUG)
+
+    while True:
+        time.sleep(5)
 
 
 if __name__ == "__main__":

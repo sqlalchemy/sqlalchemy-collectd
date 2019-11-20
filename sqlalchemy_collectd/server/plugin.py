@@ -1,34 +1,17 @@
+from __future__ import absolute_import
+
 import logging
-import sys
 import time
 
 import collectd
 
 from . import listener
-from . import monitor
 from . import receiver
-from . import summarizer
-from .. import __version__
-from .. import protocol
+from .logging import CollectdHandler
 
 log = logging.getLogger(__name__)
 
 receiver_ = None
-
-
-class CollectdHandler(logging.Handler):
-    levels = {
-        logging.INFO: collectd.info,
-        logging.WARN: collectd.warning,
-        logging.ERROR: collectd.error,
-        logging.DEBUG: collectd.info,
-        logging.CRITICAL: collectd.error,
-    }
-
-    def emit(self, record):
-        fn = self.levels[record.levelno]
-        record.msg = "[sqlalchemy-collectd] " + record.msg
-        fn(self.format(record))
 
 
 def get_config(config):
@@ -39,42 +22,43 @@ def get_config(config):
 
 def start_plugin(config):
     global receiver_
-    global monitor_
 
     config_dict = {elem.key: tuple(elem.values) for elem in config.children}
     host, port = config_dict.get("listen", ("localhost", 25827))
 
+    CollectdHandler.setup(__name__, config_dict.get("loglevel", ("info",))[0])
+
+    receiver_ = receiver.Receiver(host, int(port), log)
+
+    log.info(
+        "sqlalchemy.collectd server listening for "
+        "SQLAlchemy clients on UDP %s %d" % (host, port)
+    )
+
+    listener.listen(receiver_)
+
     monitor_host, monitor_port = config_dict.get("monitor", (None, None))
-
-    logging.getLogger().addHandler(CollectdHandler())
-
-    loglevel = {
-        "warn": logging.WARN,
-        "error": logging.ERROR,
-        "debug": logging.DEBUG,
-        "info": logging.INFO,
-    }[config_dict.get("loglevel", ("info",))[0]]
-
-    logging.getLogger().setLevel(loglevel)
-
-    log.info("sqlalchemy_collectd plugin version %s", __version__)
-    log.info("Python version: %s", sys.version)
-
-    receiver_ = receiver.Receiver()
-
     if monitor_host is not None and monitor_port is not None:
-        receiver_.monitors.append(
-            monitor.Monitor(monitor_host, int(monitor_port))
+        from sqlalchemy_collectd.connmon import plugin as connmon
+
+        collectd.warning(
+            "the connmon plugin should now be configured separately in its "
+            "own <Module> section"
         )
-
-    connection = protocol.ServerConnection(host, int(port))
-
-    listener.listen(connection, receiver_)
+        connmon.start_plugin(config)
 
 
 def read(data=None):
+    """Extract data from received messages periodically and broadcast to
+    the collectd server in which we are embedded.
+
+    The values are sent as "external" types, meaning we are using the
+    "derive" and "count" types in collectd types.db.
+
+    """
+
     now = time.time()
-    summarizer.summarize(receiver_, now)
+    receiver_.summarize(collectd, now)
 
 
 collectd.register_config(get_config)
