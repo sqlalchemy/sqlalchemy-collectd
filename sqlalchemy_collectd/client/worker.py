@@ -2,6 +2,7 @@ import logging
 import os
 import threading
 import time
+import uuid
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +26,12 @@ def _check_threads_started():
 
 def _process(interval):
     pid = os.getpid()
-    log.info("Starting process thread in pid %s", pid)
+    process_token = "%s:%s" % (pid, str(uuid.uuid4())[0:6])
+    log.info(
+        "Starting process thread in pid %s, process token %s",
+        pid,
+        process_token,
+    )
 
     try:
         while True:
@@ -37,7 +43,9 @@ def _process(interval):
                 if now - last_called[0] > interval:
                     last_called[0] = now
                     try:
-                        sender.send(collection_target, now, interval, pid)
+                        sender.send(
+                            collection_target, now, interval, process_token
+                        )
                     except Exception:
                         log.error("error sending stats", exc_info=True)
 

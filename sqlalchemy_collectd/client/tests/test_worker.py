@@ -75,7 +75,11 @@ class WorkerTest(unittest.TestCase):
 
         self.assertEqual(
             [
-                mock.call.info("Starting process thread in pid %s", mock.ANY),
+                mock.call.info(
+                    "Starting process thread in pid %s, process token %s",
+                    mock.ANY,
+                    mock.ANY,
+                ),
                 mock.call.error("error sending stats", exc_info=True),
                 mock.call.info(
                     "message sender thread caught SystemExit "

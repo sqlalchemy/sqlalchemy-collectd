@@ -38,12 +38,12 @@ class Sender(object):
             [protocol_type for protocol_type, sender in senders],
         )
 
-    def send(self, collection_target, timestamp, interval, pid):
+    def send(self, collection_target, timestamp, interval, process_token):
         values = protocol.Values(
             host=self.hostname,
             plugin=self.plugin,
             plugin_instance=self.stats_name,
-            type_instance=str(pid),
+            type_instance=str(process_token),
             interval=interval,
             time=timestamp,
         )
