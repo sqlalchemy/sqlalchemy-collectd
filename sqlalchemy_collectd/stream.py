@@ -2,26 +2,27 @@ from . import protocol
 
 
 class StreamTranslator(object):
-    """Translates Value objects between internal types and "external"
+    """Translates Value objects from the "internal" to the "external"
     types.
 
-    The "external" types are the simple types that are in collectd
-    types.db, where we are looking at the "derive" type, which is a mapping
-    to a single protocol.VALUE_DERIVE value, and the "count" type, which is
-    a mapping to a zero-bounded protocol.VALUE_GAUGE type.  There is also
-    a "gauge" type however we are working with zero-bounded ranges.
+    The mapping from the "internal" types in collectd_types.py to
+    the "external" types is to break each internal type into individual
+    values of type GAUGE or DERIVE.  The collectd "count" and "derive" types
+    defined in types.db serve as the destination for these values.
 
-    We use these pre-defined types because SQLAlchemy-collectd does not
-    have an entry in the collectd types.db file and collectd doesn't give us
-    a straightforward way to extend on these types.
-
+    While the "internal" types are more efficient and suitable for the large
+    volume of messages sent by SQLAlchemy clients, as they are sent with a low
+    "interval" setting as well as a full set of messages per  process, the
+    "external" types are publicly available for other collectd services and as
+    the per-process messages have been aggregated into per-"program" messages
+    and are usually at a lower interval, there is less message volume.
 
     """
 
-    def __init__(self, *internal_types):
-        self.internal_types = internal_types
+    def __init__(self, *collectd_types):
+        self.collectd_types = collectd_types
 
-        self._type_by_name = {t.name: t for t in internal_types}
+        self._type_by_name = {t.name: t for t in collectd_types}
         self.external_types = {}
         self.external_type_to_internal = {}
         self._protocol_type_string_names = {
@@ -29,7 +30,7 @@ class StreamTranslator(object):
             protocol.VALUE_DERIVE: "derive",
         }
 
-        for internal_type in internal_types:
+        for internal_type in collectd_types:
             for name, value_type in zip(
                 internal_type.names, internal_type.types
             ):

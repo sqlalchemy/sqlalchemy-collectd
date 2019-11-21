@@ -1,6 +1,6 @@
 import threading
 
-from .. import internal_types
+from .. import collectd_types
 from .. import protocol
 
 
@@ -26,7 +26,7 @@ class Sender(object):
         collectd_host,
         collectd_port,
         log,
-        plugin=internal_types.COLLECTD_PLUGIN_NAME,
+        plugin=collectd_types.COLLECTD_PLUGIN_NAME,
     ):
         self.hostname = hostname
         self.stats_name = stats_name
@@ -69,10 +69,10 @@ class Sender(object):
             cls.create_mutex.release()
 
 
-@sends(internal_types.pool_internal)
+@sends(collectd_types.pool_internal)
 def _send_pool(values, collection_target):
     return values.build(
-        type=internal_types.pool_internal.name,
+        type=collectd_types.pool_internal.name,
         values=[
             collection_target.num_pools,
             collection_target.num_checkedout,
@@ -84,10 +84,10 @@ def _send_pool(values, collection_target):
     )
 
 
-@sends(internal_types.totals_internal)
+@sends(collectd_types.totals_internal)
 def _send_connection_totals(values, collection_target):
     return values.build(
-        type=internal_types.totals_internal.name,
+        type=collectd_types.totals_internal.name,
         values=[
             collection_target.total_checkouts,
             collection_target.total_invalidated,
