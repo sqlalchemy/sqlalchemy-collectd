@@ -5,7 +5,65 @@ Changelog
 
 .. changelog::
     :version: 0.0.6
-    :include_notes_from: unreleased_changes
+    :released: November 21, 2019
+
+    .. change::
+        :tags: bug
+        :tickets: 9
+
+        The "pid" value that is collected by the client plugin and passed to the
+        aggregator in order to disambiguate separate processes is now augmented
+        by a six character random hex string, so that a single host that may have
+        the same pid repeated, such as when process namespaces or containers are
+        used, sends correct statistics for the same program name configuration.
+
+
+    .. change::
+        :tags: feature
+
+        Made large improvements to the connmon display, including a help screen,
+        switching between program / host stats, and new stats views.   Overall, as
+        connmon is attempting to collect from collectd servers which may also be in
+        a network of servers, the "interval" by which messages are received may be
+        long, ten seconds by default and much more. To allow a console view to be
+        meaningful, new stats are added that illustrate how many connects /
+        checkouts have occurred over the last "interval".  That way, even though
+        you might never see the current number of "checkouts" go above zero, you
+        can at least see that the last ten second interval had 25 checkouts occur.
+        The checkouts per second number can be derived from other values shown in
+        the display.
+
+
+    .. change::
+        :tags: bug
+        :tickets: 7
+
+        Fixed bug where the command line options to connmon didn't work due to
+        incorrect argument signature for the main() function.
+
+    .. change::
+        :tags: bug
+        :tickets: 8
+
+        The "connmon" tool can now display stats for SQLAlchemy stats that are sent
+        to a collectd server via the "network" plugin or through any other means.
+        Previously, the connmon tool could only display stats for messages that
+        were sent to a the collectd server by the SQLAlchemy-collectd plugin
+        itself.
+
+        The server side configuration for "connmon" is now separate from that of
+        the SQLAlchemy-collectd plugin, and the two plugins can run independently
+        of each other.  This allows for a configuration where many hosts send
+        SQLAlchemy-collectd messages to local collectd servers for aggregation, and
+        those servers then pass their messages onto another collectd server, where
+        the "connmon" tool can provide a view inside the current stats.
+
+        In order to achieve this, major refactoring such that the internals now
+        deal with data in terms of a structure which mirrors the collectd-python
+        "Values" object is in place, along with a rearchitecture of the connmon
+        tool such that it now consumes collectd "Values" objects from a particular
+        collectd server regardless of how those "Values" arrived in that server.
+
 
 .. changelog::
     :version: 0.0.5
