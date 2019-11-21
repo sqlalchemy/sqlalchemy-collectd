@@ -24,7 +24,7 @@ _TEXT_RE = re.compile(r"(#.+?)&", re.M)
 
 
 def _text_width(text):
-    return max(len(_TEXT_RE.sub("", x)) for x in text.split("\n"))
+    return max(len(_TEXT_RE.sub("", x)) + 2 for x in text.split("\n"))
 
 
 def _just(text, width):
@@ -39,7 +39,7 @@ def _justify_rows(text):
 
 
 class Layout(object):
-    def enable(self, display):
+    def pre_display(self, display):
         pass
 
     def press_escape(self, display):
@@ -55,7 +55,7 @@ class TextLayout(Layout):
 
 
 class KeyLayout(TextLayout):
-    def enable(self, display):
+    def pre_display(self, display):
         self.previous_screen = display.screen
 
     def press_escape(self, display):
@@ -88,7 +88,7 @@ class KeyLayout(TextLayout):
 
 
 class StatLayout(Layout):
-    def enable(self, display):
+    def pre_display(self, display):
         self._calc_x_positions(display)
 
     def get_rows(self, display, stat, now):
@@ -97,11 +97,10 @@ class StatLayout(Layout):
     def _calc_x_positions(self, display):
         x = 0
         widths = []
-        midline = False
         for idx, (cname, _, col_width, just) in enumerate(self.columns):
-            charwidth = max(
-                _text_width(cname), int(display._winsize[1] * col_width)
-            )
+            text_width = _text_width(cname)
+            layout_width = int(display._winsize[1] * col_width)
+            charwidth = max(text_width, layout_width)
             if just == "L":
                 widths.append((x, charwidth))
                 x += charwidth
@@ -114,15 +113,7 @@ class StatLayout(Layout):
                     for (r_cname, _, r_col_width, _) in self.columns[idx:]
                 )
                 x = display._winsize[1] - width
-                if not midline:
-                    midline = True
-                    midline_at = widths[-1][0] + widths[-1][1]
-                    midline_over = midline_at - x
-                    if midline_over > 0:
-                        widths[-1] = (
-                            widths[-1][0],
-                            widths[-1][1] - midline_over,
-                        )
+
                 widths.append((x, charwidth))
 
         self._x_positions = widths
@@ -139,7 +130,12 @@ class StatLayout(Layout):
                 ]
             )
             x, charwidth = next(x_positions)
-            display._render_str(y, x, elem)  # , max_=charwidth - 1)
+            display._render_str(
+                y,
+                x,
+                elem,
+                center_within_width=charwidth if justify == "R" else None,
+            )
 
     def render(self, display, now):
         stat = display.stat
@@ -181,9 +177,21 @@ class StatLayout(Layout):
             cname, fmt, width, justify = col
             x, charwidth = next(x_positions)
             rows = _justify_rows(cname)
-            display._render_str(top, x, rows[0], "Cb")
+            display._render_str(
+                top,
+                x,
+                rows[0],
+                "Cb",
+                center_within_width=charwidth if justify == "R" else None,
+            )
             if len(rows) > 1:
-                display._render_str(top + 1, x, rows[1], "Cb")
+                display._render_str(
+                    top + 1,
+                    x,
+                    rows[1],
+                    "Cb",
+                    center_within_width=charwidth if justify == "R" else None,
+                )
 
         rows = self.get_rows(display, stat, now)
 
@@ -199,7 +207,7 @@ class ProgStatsLayout(StatLayout):
         ("processes\ncurr / max", "%4d/%4d", 0.15, "R"),
         ("connections\ncurr / max / int", "%4d/%4d/%4d", 0.15, "R"),
         ("checkouts\ncurr / max / int", "%4d/%4d/%4d", 0.15, "R"),
-        ("checkouts\n/sec", "%.2f", 0.15, "R"),
+        ("checkouts\n/sec", "%.2f", 0.10, "R"),
     ]
 
     def row_for_hostprog(self, hostprog, now):
@@ -249,14 +257,7 @@ class ProgStatsLayout(StatLayout):
 
 
 class HostStatsLayout(ProgStatsLayout):
-    columns = [
-        ("hostname\n(#R&[dis]#G&connected#d&)", "%s", 0.12, "L"),
-        ("last msg\nsecs / int", "%s/%3d", 0.15, "R"),
-        ("processes\ncurr / max", "%4d/%4d", 0.15, "R"),
-        ("connections\ncurr / max / int", "%4d/%4d/%4d", 0.15, "R"),
-        ("checkouts\ncurr / max / int", "%4d/%4d/%4d", 0.15, "R"),
-        ("checkouts\n/sec", "%3.2f", 0.15, "R"),
-    ]
+    columns = ProgStatsLayout.columns[0:1] + ProgStatsLayout.columns[2:]
 
     def get_rows(self, display, stat, now):
         rows = []
@@ -286,9 +287,8 @@ class Display(object):
         ):
             curses.resize_term(*self._winsize)
             if screen:
+                screen.pre_display(self)
                 self.screen = screen
-
-            self.screen.enable(self)
 
             if screen:
                 self._render(time.time())
@@ -360,9 +360,23 @@ class Display(object):
             self._color_pairs[color] = mapped
             return mapped
 
-    def _render_str(self, y, x, text, default_color="D", max_=None):
+    def _render_str(
+        self,
+        y,
+        x,
+        text,
+        default_color="D",
+        max_=None,
+        center_within_width=None,
+    ):
+        text_width = _text_width(text)
         if x < 0:
-            x = self._winsize[1] - _text_width(text)
+            x = self._winsize[1] - text_width
+        elif (
+            center_within_width is not None
+            and center_within_width > text_width
+        ):
+            x += (center_within_width - text_width) // 2
 
         current_color = dflt = self._get_color(default_color)
         if max_:
