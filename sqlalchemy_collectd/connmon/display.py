@@ -35,7 +35,11 @@ def _just(text, width):
 def _justify_rows(text):
     width = _text_width(text)
     return [_just(row, width) for row in text.split("\n")]
-    # return text.split("\n")
+
+
+def _dash_for_fmt(fmt_frag):
+    sample = fmt_frag % 5
+    return "".join(" " if char != "5" else "-" for char in sample)
 
 
 class Layout(object):
@@ -128,7 +132,9 @@ class StatLayout(Layout):
 
             elem = "  ".join(
                 [
-                    (fmt_frag % elem_frag) if elem_frag is not None else "-"
+                    (fmt_frag % elem_frag)
+                    if elem_frag is not None
+                    else _dash_for_fmt(fmt_frag)
                     for fmt_frag, elem_frag in zip(fmt.split("/"), elem)
                 ]
             )
