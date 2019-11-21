@@ -98,20 +98,20 @@ class StatLayout(Layout):
         x = 0
         widths = []
         midline = False
-        for idx, col in enumerate(self.columns):
-            cname = col[0]
-            width = col[2]
-            just = col[3]
+        for idx, (cname, _, col_width, just) in enumerate(self.columns):
             charwidth = max(
-                _text_width(cname), int(display._winsize[1] * width)
+                _text_width(cname), int(display._winsize[1] * col_width)
             )
             if just == "L":
                 widths.append((x, charwidth))
                 x += charwidth
             else:
                 width = sum(
-                    max(_text_width(cname), int(display._winsize[1] * width))
-                    for col in self.columns[idx:]
+                    max(
+                        _text_width(r_cname),
+                        int(display._winsize[1] * r_col_width),
+                    )
+                    for (r_cname, _, r_col_width, _) in self.columns[idx:]
                 )
                 x = display._winsize[1] - width
                 if not midline:
@@ -193,9 +193,9 @@ class StatLayout(Layout):
 
 class ProgStatsLayout(StatLayout):
     columns = [
-        ("hostname\n(#R&[dis]#G&connected#d&)", "%s", 0.12, "L"),
+        ("hostname\n(#R&[dis]#G&connected#d&)", "%s", 0.18, "L"),
         ("progname", "%s", 0.15, "L"),
-        ("last msg\nsecs / int", "%s/%3d", 0.15, "R"),
+        ("last msg\nsecs / int", "%s/%3d", 0.10, "R"),
         ("processes\ncurr / max", "%4d/%4d", 0.15, "R"),
         ("connections\ncurr / max / int", "%4d/%4d/%4d", 0.15, "R"),
         ("checkouts\ncurr / max / int", "%4d/%4d/%4d", 0.15, "R"),
