@@ -45,6 +45,9 @@ class Layout(object):
     def press_escape(self, display):
         pass
 
+    def resize(self, display):
+        pass
+
 
 class TextLayout(Layout):
     def render(self, display, now):
@@ -88,7 +91,7 @@ class KeyLayout(TextLayout):
 
 
 class StatLayout(Layout):
-    def pre_display(self, display):
+    def resize(self, display):
         self._calc_x_positions(display)
 
     def get_rows(self, display, stat, now):
@@ -289,6 +292,8 @@ class Display(object):
             if screen:
                 screen.pre_display(self)
                 self.screen = screen
+
+            self.screen.resize(self)
 
             if screen:
                 self._render(time.time())
