@@ -30,7 +30,7 @@ class ListenerTest(unittest.TestCase):
         with mock.patch.object(listener, "log") as mock_logger:
             listener.listen(mock.Mock(receive=receive))
 
-        listener.listen_thread.join(1)
+        listener.listen_thread.join(5)
 
         # call "five" doesn't happen because we should have exited
         self.assertEqual(

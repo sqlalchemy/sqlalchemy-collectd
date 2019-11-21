@@ -1,3 +1,4 @@
+import collections
 import logging
 import os
 import threading
@@ -9,7 +10,7 @@ log = logging.getLogger(__name__)
 _WORKER_THREAD = None
 _PID = os.getpid()
 
-_collection_targets = {}
+_collection_targets = collections.OrderedDict()
 
 
 def _check_threads_started():

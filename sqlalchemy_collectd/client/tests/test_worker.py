@@ -60,7 +60,7 @@ class WorkerTest(unittest.TestCase):
 
             # now wait, it will hit the SystemExit and exit.
             # if it times out, we failed.
-            worker._WORKER_THREAD.join(1)
+            worker._WORKER_THREAD.join(5)
 
         # see that it did what we asked.
         self.assertEqual(
