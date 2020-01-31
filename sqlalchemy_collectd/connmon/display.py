@@ -420,7 +420,8 @@ class Display(object):
         self._render_str(
             0,
             -1,
-            "#D&Commands: #Y&(H)#D&ost stats #Y&(P)#D&rogram stats #Y&(?)#D&Legend #Y&(Q)#D&uit",
+            "#D&Commands: #Y&(H)#D&ost stats #Y&(P)#D&rogram stats "
+            "#Y&(?)#D&Legend #Y&(Q)#D&uit",
         )
 
         self.screen.render(self, now)

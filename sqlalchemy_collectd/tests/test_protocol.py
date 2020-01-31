@@ -37,12 +37,6 @@ class CollectDProtocolTest(unittest.TestCase):
     ) + value_block
 
     def test_values_sum(self):
-        type_ = protocol.Type(
-            "my_type",
-            ("some_val", protocol.VALUE_GAUGE),
-            ("some_other_val", protocol.VALUE_DERIVE),
-        )
-
         value = protocol.Values(
             type="my_type",
             host="somehost",
@@ -84,7 +78,6 @@ class CollectDProtocolTest(unittest.TestCase):
             time=50,
         )
 
-        v1 = value.build(time=60)
         v2 = value.build(time=70)
 
         self.assertEqual(
