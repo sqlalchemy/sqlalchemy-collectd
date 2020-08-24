@@ -38,10 +38,28 @@ class Plugin(CreateEnginePlugin):
             if coerce_:
                 dest[dest_name] = coerce_(dest[dest_name])
 
+        sqla14_style = hasattr(CreateEnginePlugin, "update_url")
+
         if name in url.query:
-            dest[dest_name] = url.query.pop(name)
+            if sqla14_style:
+                dest[dest_name] = url.query[name]
+            else:
+                dest[dest_name] = url.query.pop(name)
             if coerce_:
                 dest[dest_name] = coerce_(dest[dest_name])
+
+    def update_url(self, url):
+        return url.difference_update_query(
+            [
+                "collectd_host",
+                "collectd_port",
+                "collectd_report_host",
+                "collectd_program_name",
+            ]
+        )
+
+    def handle_url_params(self, url_query):
+        """modify url query parameters"""
 
     def handle_dialect_kwargs(self, dialect_cls, dialect_args):
         """parse and modify dialect kwargs"""

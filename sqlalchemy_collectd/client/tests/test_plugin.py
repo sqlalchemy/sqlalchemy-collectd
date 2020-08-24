@@ -38,6 +38,8 @@ class PluginTest(unittest.TestCase):
             )
             kwargs = {"unrelated": "bar"}
             p = plugin.Plugin(url, kwargs)
+            if hasattr(url, "difference_update_query"):
+                url = p.update_url(url)
             engine = mock.Mock()
             p.engine_created(engine)
 
@@ -56,6 +58,8 @@ class PluginTest(unittest.TestCase):
             )
             kwargs = {"unrelated": "bar"}
             p = plugin.Plugin(url, kwargs)
+            if hasattr(url, "difference_update_query"):
+                url = p.update_url(url)
             engine = mock.Mock()
             p.engine_created(engine)
 
@@ -74,6 +78,8 @@ class PluginTest(unittest.TestCase):
             )
             kwargs = {"collectd_host": "172.18.0.2", "collectd_port": 5678}
             p = plugin.Plugin(url, kwargs)
+            if hasattr(url, "difference_update_query"):
+                url = p.update_url(url)
             engine = mock.Mock()
             p.engine_created(engine)
 
