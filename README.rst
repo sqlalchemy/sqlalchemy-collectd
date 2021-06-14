@@ -478,14 +478,14 @@ SQLAlchemy-collectd is part of the `SQLAlchemy Project <https://www.sqlalchemy.o
 adheres to the same standards and conventions as the core project.
 
 Development / Bug reporting / Pull requests
-___________________________________________
+--------------------------------------------
 
 Please refer to the
 `SQLAlchemy Community Guide <https://www.sqlalchemy.org/develop.html>`_ for
 guidelines on coding and participating in this project.
 
 Code of Conduct
-_______________
+---------------
 
 Above all, SQLAlchemy places great emphasis on polite, thoughtful, and
 constructive communication between users and developers.
