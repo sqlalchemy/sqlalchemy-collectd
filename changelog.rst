@@ -5,7 +5,14 @@ Changelog
 
 .. changelog::
     :version: 0.0.7
-    :include_notes_from: unreleased_changes
+    :released: June 14, 2021
+
+    .. change::
+        :tags: change
+
+        Updated the SQLAlchemy plugin to accommodate for changes
+        to the URL object in SQLAlchemy 1.4.
+
 
 .. changelog::
     :version: 0.0.6
