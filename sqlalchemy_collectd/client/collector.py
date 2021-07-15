@@ -129,7 +129,7 @@ class EngineCollector(object):
         id_ = self.conn_ident(dbapi_conn)
         self.checkedin.add(id_)
 
-    def _invalidate_evt(self, dbapi_conn, connection_rec):
+    def _invalidate_evt(self, dbapi_conn, connection_rec, exc):
         id_ = self.conn_ident(dbapi_conn)
         self.collection_target.total_invalidated += 1
         self.invalidated.add(id_)
