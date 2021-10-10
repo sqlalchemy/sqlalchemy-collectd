@@ -1,6 +1,6 @@
 [gerrit]
 host=gerrit.sqlalchemy.org
 project=sqlalchemy/sqlalchemy-collectd
-defaultbranch=master
+defaultbranch=main
 port=29418
 
