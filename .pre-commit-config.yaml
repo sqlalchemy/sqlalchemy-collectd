@@ -7,12 +7,12 @@ repos:
     -   id: black
 
 -   repo: https://github.com/sqlalchemyorg/zimports/
-    rev: master
+    rev: v0.4.1
     hooks:
     -   id: zimports
 
 -   repo: https://github.com/pycqa/flake8
-    rev: master
+    rev: 3.9.2
     hooks:
     -   id: flake8
         additional_dependencies:
