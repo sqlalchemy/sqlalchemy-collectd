@@ -9,7 +9,7 @@ from .. import plugin
 class PluginTest(unittest.TestCase):
     def test_start_no_args(self):
         with mock.patch.object(plugin, "start_plugin") as start_plugin:
-            url = sqla_url.URL("mysql+pymysql://scott:tiger@localhost/")
+            url = sqla_url.make_url("mysql+pymysql://scott:tiger@localhost/")
             p = plugin.Plugin(url, {})
             engine = mock.Mock()
             p.engine_created(engine)
@@ -18,7 +18,7 @@ class PluginTest(unittest.TestCase):
 
     def test_start_engine_args(self):
         with mock.patch.object(plugin, "start_plugin") as start_plugin:
-            url = sqla_url.URL("mysql+pymysql://scott:tiger@localhost/")
+            url = sqla_url.make_url("mysql+pymysql://scott:tiger@localhost/")
             p = plugin.Plugin(
                 url, {"collectd_host": "127.0.0.1", "collectd_port": 5678}
             )

@@ -1,0 +1,7 @@
+.. change::
+    :tags: bug
+    :tickets: 11
+
+    Fixed bug where the argument signature for the invalidate event handler
+    incorrectly formed, preventing invalidation events from being intercepted
+    correctly.  Pull request courtesy Dmitry Kulagin.
