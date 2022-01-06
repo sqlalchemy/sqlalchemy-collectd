@@ -5,7 +5,15 @@ Changelog
 
 .. changelog::
     :version: 0.0.8
-    :include_notes_from: unreleased_changes
+    :released: January 6, 2022
+
+    .. change::
+        :tags: bug
+        :tickets: 11
+
+        Fixed bug where the argument signature for the invalidate event handler
+        incorrectly formed, preventing invalidation events from being intercepted
+        correctly.  Pull request courtesy Dmitry Kulagin.
 
 .. changelog::
     :version: 0.0.7
