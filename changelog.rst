@@ -4,6 +4,10 @@ Changelog
 ==========
 
 .. changelog::
+    :version: 0.1.0
+    :include_notes_from: unreleased_changes
+
+.. changelog::
     :version: 0.0.8
     :released: January 6, 2022
 
