@@ -1,11 +1,10 @@
-import unittest
-
-import mock
+from unittest import mock
 
 from .. import listener
+from ... import testing
 
 
-class ListenerTest(unittest.TestCase):
+class ListenerTest(testing.TestBase):
     def test_receive_resilency(self):
         canary = mock.Mock()
 

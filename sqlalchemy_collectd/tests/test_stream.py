@@ -1,10 +1,9 @@
-import unittest
-
 from .. import protocol
 from .. import stream
+from .. import testing
 
 
-class BreakIntoValuesTest(unittest.TestCase):
+class BreakIntoValuesTest(testing.TestBase):
     def _internal_stream_one_element(self, type_instance="sometypeinstance"):
         value = protocol.Values(
             type="my_type_one_element",

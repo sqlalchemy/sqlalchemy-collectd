@@ -11,7 +11,7 @@ from .logging import CollectdHandler
 
 log = logging.getLogger(__name__)
 
-receiver_ = None
+receiver_: receiver.Receiver
 
 
 def get_config(config):
@@ -56,7 +56,7 @@ def read(data=None):
     "derive" and "count" types in collectd types.db.
 
     """
-
+    global receiver_
     now = time.time()
     receiver_.summarize(collectd, now)
 

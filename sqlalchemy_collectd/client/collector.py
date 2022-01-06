@@ -7,7 +7,7 @@ from sqlalchemy import event
 from . import worker
 
 
-class CollectionTarget(object):
+class CollectionTarget:
     targets = {}
     create_mutex = threading.Lock()
 
@@ -86,7 +86,7 @@ class CollectionTarget(object):
         return len(self.transactions)
 
 
-class EngineCollector(object):
+class EngineCollector:
     def __init__(self, collection_target, engine):
         self.collection_target = collection_target
         self.engine = engine

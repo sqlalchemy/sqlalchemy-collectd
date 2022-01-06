@@ -1,0 +1,10 @@
+.. change::
+    :tags: change
+
+    Minimum requirements are now:
+
+    * Python 3.6 or higher
+    * SQLAlchemy 1.3 or higher
+
+    Test support for SQLAlchemy 1.1, 1.2 is dropped.
+    Codebase is now Python 3 specific.

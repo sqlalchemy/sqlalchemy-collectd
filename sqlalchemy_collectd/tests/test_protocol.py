@@ -1,11 +1,10 @@
-import unittest
-
-import mock
+from unittest import mock
 
 from .. import protocol
+from .. import testing
 
 
-class CollectDProtocolTest(unittest.TestCase):
+class CollectDProtocolTest(testing.TestBase):
     def test_encode_type_values(self):
         type_ = protocol.Type(
             "my_type",

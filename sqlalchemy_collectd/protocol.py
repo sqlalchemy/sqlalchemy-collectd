@@ -6,6 +6,10 @@ import os
 import socket
 import struct
 import threading
+from typing import Optional
+from typing import Sequence
+from typing import Tuple
+from typing import Union
 
 DEFAULT_INTERVAL = 10
 MAX_PACKET_SIZE = 1024
@@ -38,7 +42,7 @@ _value_formats = {
 }
 
 
-class Type(object):
+class Type:
     """Represents a collectd type and its data template.
 
     Here, we are encoding what we need to know about a collectd type that we'd
@@ -62,6 +66,11 @@ class Type(object):
         "_message_template",
         "_field_names",
     )
+
+    name: str
+    _field_names: Sequence[str]
+    _value_types: Sequence[int]
+    _value_formats: Sequence[struct.Struct]
 
     def __init__(self, name, *db_template):
         """Contruct a new Type.
@@ -110,7 +119,7 @@ class Type(object):
         return msg
 
 
-class Values(object):
+class Values:
     """A mirror object of collectd.Values"""
 
     __slots__ = (
@@ -123,6 +132,15 @@ class Values(object):
         "interval",
         "values",
     )
+
+    type: str
+    type_instance: str
+    plugin: str
+    plugin_instance: str
+    host: str
+    time: int
+    interval: int
+    values: Sequence[Union[float, int]]
 
     def __init__(self, **kw):
         # TODO: see what new python 3 values objects or what can help
@@ -171,7 +189,7 @@ class Values(object):
 
         return self.build(
             values=[v + o for v, o in zip(self.values, other_values)],
-            **_reverse_coalesce
+            **_reverse_coalesce,
         )
 
     def __eq__(self, other):
@@ -216,10 +234,10 @@ class Values(object):
         )
 
 
-class NetworkSender(object):
-    def __init__(self, connection, types):
+class NetworkSender:
+    def __init__(self, connection: "ClientConnection", types: Sequence[Type]):
         self._types = {type_.name: type_ for type_ in types}
-        self._senders = {}
+        self._senders = {}  # TODO: not used?
         self.connection = connection
         self.log = connection.log
 
@@ -230,8 +248,8 @@ class NetworkSender(object):
 
         try:
             type_obj = self._types[type_name]
-        except KeyError:
-            raise TypeError("don't know type: %s" % type_name)
+        except KeyError as ke:
+            raise TypeError(f"don't know type: {type_name}") from ke
 
         _pack_string = self._pack_string
         _host_message_part = _pack_string(TYPE_HOST, values_obj.host)
@@ -259,7 +277,7 @@ class NetworkSender(object):
         )
         connection.send(header_ + payload)
 
-    def _pack_string(self, typecode, value):
+    def _pack_string(self, typecode: int, value: str) -> bytes:
         value = value or ""
         return (
             header.pack(typecode, 5 + len(value))
@@ -268,8 +286,8 @@ class NetworkSender(object):
         )
 
 
-class NetworkReceiver(object):
-    def __init__(self, connection, types):
+class NetworkReceiver:
+    def __init__(self, connection: "ServerConnection", types: Sequence[Type]):
         self.connection = connection
         self._receivers = {
             TYPE_HOST: self._unpack_string,
@@ -284,7 +302,7 @@ class NetworkReceiver(object):
         self._types = {type_.name: type_ for type_ in types}
         self.log = connection.log
 
-    def receive(self):
+    def receive(self) -> Optional[Values]:
         connection = self.connection
         buf, host_ = connection.receive()
         result = self._unpack_packet(buf)
@@ -294,6 +312,7 @@ class NetworkReceiver(object):
             self.log.warn("Message did not have TYPE_TYPE block, skipping")
             return None
 
+        value = None
         try:
             self._types[type_name]
         except KeyError:
@@ -303,14 +322,15 @@ class NetworkReceiver(object):
             value = self._to_value(result)
             return value
         finally:
-            self.log.debug(
-                "receive[UDP:%s:%s] -> %s",
-                connection.host,
-                connection.port,
-                value,
-            )
+            if value is not None:
+                self.log.debug(
+                    "receive[UDP:%s:%s] -> %s",
+                    connection.host,
+                    connection.port,
+                    value,
+                )
 
-    def _to_value(self, result):
+    def _to_value(self, result) -> Values:
         return Values(
             host=result[TYPE_HOST],
             time=result[TYPE_TIME],
@@ -360,7 +380,11 @@ class NetworkReceiver(object):
         return result
 
 
-class ServerConnection(object):
+class ServerConnection:
+    host: str
+    port: int
+    socket: "socket.socket"
+
     def __init__(self, host, port, log):
         self.host = host
         self.port = port
@@ -368,14 +392,18 @@ class ServerConnection(object):
         self.sock.bind((host, port))
         self.log = log
 
-    def receive(self):
+    def receive(self) -> Tuple[bytes, str]:
         data, addr = self.sock.recvfrom(1024)
         return data, addr
 
 
-class ClientConnection(object):
+class ClientConnection:
     connections = {}
     create_mutex = threading.Lock()
+
+    socket: Optional["socket.socket"]
+    host: str
+    port: int
 
     def __init__(self, host, port, log):
         self.host = host
@@ -385,13 +413,14 @@ class ClientConnection(object):
         self.socket = None
         self.pid = None
 
-    def _check_connect(self):
+    def _check_connect(self) -> "socket.socket":
         if self.socket is None or self.pid != os.getpid():
             self.pid = os.getpid()
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        return self.socket
 
     @classmethod
-    def for_host_port(cls, host, port, log):
+    def for_host_port(cls, host, port, log) -> "ClientConnection":
         cls.create_mutex.acquire()
         try:
             key = (host, port)
@@ -406,11 +435,11 @@ class ClientConnection(object):
         finally:
             cls.create_mutex.release()
 
-    def send(self, message):
+    def send(self, message: bytes):
         self._mutex.acquire()
         try:
-            self._check_connect()
-            self.socket.sendto(message, (self.host, self.port))
+            socket = self._check_connect()
+            socket.sendto(message, (self.host, self.port))
         except IOError:
             self.log.error("Error in socket.sendto", exc_info=True)
         finally:

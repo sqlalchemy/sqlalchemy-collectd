@@ -1,12 +1,11 @@
 import threading
-import unittest
-
-import mock
+from unittest import mock
 
 from .. import worker
+from ... import testing
 
 
-class WorkerTest(unittest.TestCase):
+class WorkerTest(testing.TestBase):
     def test_worker_resilency(self):
         canary = mock.Mock()
 

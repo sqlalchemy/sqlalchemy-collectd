@@ -15,7 +15,7 @@ def sends(protocol_type):
     return decorate
 
 
-class Sender(object):
+class Sender:
     senders = {}
     create_mutex = threading.Lock()
 

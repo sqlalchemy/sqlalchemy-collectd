@@ -2,6 +2,9 @@ from __future__ import absolute_import
 
 import itertools
 import logging
+from typing import cast
+from typing import Dict
+from typing import Tuple
 
 from .. import collectd_types
 from .. import protocol
@@ -10,7 +13,11 @@ from .. import stream
 log = logging.getLogger(__name__)
 
 
-class Receiver(object):
+class Receiver:
+    buckets: Dict[
+        str, stream.TimeBucket[Tuple[str, str, str], protocol.Values]
+    ]
+
     def __init__(
         self, host, port, log, plugin=collectd_types.COLLECTD_PLUGIN_NAME
     ):
@@ -27,12 +34,17 @@ class Receiver(object):
         self.translator = stream.StreamTranslator(*self.collectd_types)
         self.bucket_names = [t.name for t in self.collectd_types]
         self.buckets = {
-            name: stream.TimeBucket() for name in self.bucket_names
+            name: cast(
+                stream.TimeBucket[Tuple[str, str, str], protocol.Values],
+                stream.TimeBucket(),
+            )
+            for name in self.bucket_names
         }
 
     def receive(self):
         values_obj = self.network_receiver.receive()
-        self._set_stats(values_obj)
+        if values_obj is not None:
+            self._set_stats(values_obj)
 
     def summarize(self, collectd, timestamp):
         for type_ in self.collectd_types:
@@ -52,7 +64,7 @@ class Receiver(object):
                 ) in self.translator.break_into_individual_values(values_obj):
                     external_values_obj.send_to_collectd(collectd, self.log)
 
-    def _set_stats(self, values):
+    def _set_stats(self, values: protocol.Values):
         bucket_name = values.type
         timestamp = values.time
         hostname = values.host

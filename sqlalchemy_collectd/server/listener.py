@@ -1,12 +1,15 @@
-from __future__ import absolute_import
-
 import logging
 import threading
+import typing
+
+if typing.TYPE_CHECKING:
+    from .receiver import Receiver
+
 
 log = logging.getLogger("sqlalchemy_collectd")
 
 
-def _receive(receiver):
+def _receive(receiver: "Receiver"):
     while True:
         try:
             receiver.receive()
@@ -20,7 +23,7 @@ def _receive(receiver):
             break
 
 
-def listen(receiver):
+def listen(receiver: "Receiver"):
     global listen_thread
     listen_thread = threading.Thread(target=_receive, args=(receiver,))
     listen_thread.daemon = True

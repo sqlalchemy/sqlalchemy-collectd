@@ -1,12 +1,12 @@
-import unittest
+from unittest import mock
 
-import mock
 from sqlalchemy.engine import url as sqla_url
 
 from .. import plugin
+from ... import testing
 
 
-class PluginTest(unittest.TestCase):
+class PluginTest(testing.TestBase):
     def test_start_no_args(self):
         with mock.patch.object(plugin, "start_plugin") as start_plugin:
             url = sqla_url.make_url("mysql+pymysql://scott:tiger@localhost/")

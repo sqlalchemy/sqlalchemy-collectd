@@ -1,4 +1,5 @@
-import mock
+from unittest import mock
+
 import pytest
 from sqlalchemy import create_engine
 
@@ -13,7 +14,7 @@ from ... import testing
 # a subsequent release of sqlalchemy-collectd will switch to pytest fully.
 
 
-class TestCollector(testing.TestBase):
+class CollectorTest(testing.TestBase):
     @pytest.fixture
     def collector_fixture(self):
         engine = create_engine("sqlite://")

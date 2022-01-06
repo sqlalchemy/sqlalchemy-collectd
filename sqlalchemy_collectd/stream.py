@@ -1,7 +1,15 @@
+from typing import Dict
+from typing import Generic
+from typing import Iterator
+from typing import Optional
+from typing import Tuple
+from typing import TypeVar
+from typing import Union
+
 from . import protocol
 
 
-class StreamTranslator(object):
+class StreamTranslator:
     """Translates Value objects from the "internal" to the "external"
     types.
 
@@ -52,7 +60,12 @@ class StreamTranslator(object):
             )
 
 
-class TimeBucket(object):
+_TBKEY = TypeVar("_TBKEY")
+_TBVALUE = TypeVar("_TBVALUE")
+
+
+class TimeBucket(Generic[_TBKEY, _TBVALUE]):
+
     """Store objects based on the latest one received, discarding
     those that are stale based on the timestamp / interval given for that
     value.
@@ -67,7 +80,9 @@ class TimeBucket(object):
         self.last_interval = 0
         self.interval_factor = 1.2
 
-    def _get_bucket(self, timestamp, interval):
+    def _get_bucket(
+        self, timestamp: Union[float, int], interval: Optional[int]
+    ) -> "DictFacade[_TBKEY, _TBVALUE]":
         if interval is not None:
             self.last_interval = interval
 
@@ -79,9 +94,9 @@ class TimeBucket(object):
         ):
 
             raise ValueError(
-                "bucket timestamp is now %s, "
-                "greater than given timestamp of %s plus interval %s"
-                % (self.last_timestamp, timestamp, oldest_to_accept)
+                f"bucket timestamp is now {self.last_timestamp}, "
+                f"greater than given timestamp of {timestamp} "
+                f"plus interval {oldest_to_accept}"
             )
         for k in list(self.bucket):
             ts, b_interval, value = self.bucket[k]
@@ -91,47 +106,72 @@ class TimeBucket(object):
         self.last_timestamp = timestamp
         return DictFacade(timestamp, interval, self.bucket)
 
-    def put(self, timestamp, interval, key, data):
+    def put(
+        self,
+        timestamp: int,
+        interval: int,
+        key: _TBKEY,
+        data: _TBVALUE,
+    ) -> "DictFacade[_TBKEY, _TBVALUE]":
         bucket_data = self._get_bucket(timestamp, interval)
         bucket_data[key] = data
         return bucket_data
 
-    def get(self, current_time, key, interval=None):
+    def get(
+        self,
+        current_time: Union[float, int],
+        key: _TBKEY,
+        interval: Optional[int] = None,
+    ) -> Optional[_TBVALUE]:
         return self._get_bucket(current_time, interval).get(key)
 
-    def get_data(self, current_time, interval=None):
+    def get_data(
+        self, current_time: Union[float, int], interval: Optional[int] = None
+    ) -> "DictFacade[_TBKEY, _TBVALUE]":
         return self._get_bucket(current_time, interval)
 
 
-class DictFacade(object):
+class DictFacade(Generic[_TBKEY, _TBVALUE]):
     __slots__ = "timestamp", "interval", "dictionary"
 
-    def __init__(self, timestamp, interval, dictionary):
+    def __init__(
+        self,
+        timestamp: Union[float, int],
+        interval: Optional[int],
+        dictionary: Dict[
+            _TBKEY, Tuple[Union[float, int], Optional[int], _TBVALUE]
+        ],
+    ):
         self.timestamp = timestamp
         self.interval = interval
         self.dictionary = dictionary
 
-    def __contains__(self, key):
+    def __contains__(self, key: _TBKEY) -> bool:
         return key in self.dictionary
 
-    def get(self, key, default=None):
+    def get(
+        self, key: _TBKEY, default: Optional[_TBVALUE] = None
+    ) -> Optional[_TBVALUE]:
         timestamp, interval, value = self.dictionary.get(
             key, (None, None, default)
         )
         return value
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: _TBKEY) -> _TBVALUE:
         timestamp, interval, value = self.dictionary[key]
         return value
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: _TBKEY, value: _TBVALUE):
         self.dictionary[key] = (self.timestamp, self.interval, value)
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: _TBKEY):
         del self.dictionary[key]
 
-    def __iter__(self):
+    def __len__(self) -> int:
+        return len(self.dictionary)
+
+    def __iter__(self) -> Iterator[_TBKEY]:
         return iter(self.dictionary)
 
-    def keys(self):
+    def keys(self) -> Iterator[_TBKEY]:
         return self.dictionary.keys()
