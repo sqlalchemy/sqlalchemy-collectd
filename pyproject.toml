@@ -1,3 +1,62 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sqlalchemy-collectd"
+readme = {file = "README.rst", content-type = "text/x-rst"}
+dynamic = ["version"]
+authors = [{ name = "Mike Bayer", email = "mike_mp@zzzcomputing.com" }]
+description = "Send database connection pool stats to collectd"
+keywords = ["sqlalchemy", "collectd"]
+license = {file = "LICENSE"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database :: Front-Ends",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "collectd",
+    "SQLAlchemy>=1.3.0"
+]
+
+[tool.setuptools.packages]
+find = {}  # Scanning implicit namespaces is active by default
+
+[project.urls]
+Homepage = "https://github.com/sqlalchemy/sqlalchemy-collectd"
+
+[project.scripts]
+connmon = "sqlalchemy_collectd.connmon.main:main"
+
+[project.entry-points."sqlalchemy.plugins"]
+collectd = "sqlalchemy_collectd.client.plugin:Plugin"
+
+
+[tool.mypy]
+mypy_path = "./sqlalchemy_collectd/"
+strict = false
+show_error_codes = true
+incremental = true
+
+
 [tool.black]
 line-length = 79
-target-version = ['py36']
+target-version = ['py38']
+
+
+[tool.pytest.ini_options]
+addopts = "--tb native -v -r sfxX --ignore=sqlalchemy -p warnings -p logging --strict-markers"
+python_files = "sqlalchemy_collectd/*/test_*.py"
+python_classes= "*Test"

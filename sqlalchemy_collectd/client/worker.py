@@ -1,16 +1,25 @@
+from __future__ import annotations
+
 import collections
 import logging
 import os
 import threading
 import time
+from typing import TYPE_CHECKING
 import uuid
+
+if TYPE_CHECKING:
+    from .collector import CollectionTarget
+    from .sender import Sender
 
 log = logging.getLogger(__name__)
 
-_WORKER_THREAD = None
+_WORKER_THREAD: threading.Thread | None = None
 _PID = os.getpid()
 
-_collection_targets = collections.OrderedDict()
+_collection_targets: dict[
+    tuple[CollectionTarget, Sender], list[int | float]
+] = collections.OrderedDict()
 
 
 def _check_threads_started():
@@ -18,7 +27,6 @@ def _check_threads_started():
     ospid = os.getpid()
 
     if _WORKER_THREAD is None or _PID != ospid:
-
         _PID = ospid
         _WORKER_THREAD = threading.Thread(target=_process, args=(2,))
         _WORKER_THREAD.daemon = True

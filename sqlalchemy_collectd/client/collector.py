@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import logging
 import threading
+from typing import Dict
 import weakref
 
 from sqlalchemy import event
@@ -8,7 +11,7 @@ from . import worker
 
 
 class CollectionTarget:
-    targets = {}
+    targets: Dict[str, CollectionTarget] = {}
     create_mutex = threading.Lock()
 
     def __init__(self, name):

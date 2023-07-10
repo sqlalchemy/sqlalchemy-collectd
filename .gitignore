@@ -9,6 +9,7 @@
 *,cover
 .cache
 .eggs
+.dmypy.json
 /.tox
 .venv
 *.egg-info

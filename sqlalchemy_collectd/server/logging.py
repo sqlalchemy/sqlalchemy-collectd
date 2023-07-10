@@ -1,13 +1,15 @@
-from __future__ import absolute_import
+from __future__ import annotations
 
 import logging
 import sys
 
-import collectd
-
 from .. import __version__
 
-_the_handler = None
+
+if True:
+    import collectd  # type: ignore[import]
+
+_the_handler: CollectdHandler | None = None
 
 
 class CollectdHandler(logging.Handler):

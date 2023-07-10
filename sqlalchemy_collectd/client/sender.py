@@ -1,22 +1,44 @@
+from __future__ import annotations
+
 import threading
+from typing import Dict
+from typing import List
+from typing import Protocol
+from typing import Tuple
+from typing import TYPE_CHECKING
 
 from .. import collectd_types
 from .. import protocol
 
+if TYPE_CHECKING:
+    from logging import Logger
 
-senders = []
+    from .collector import CollectionTarget
 
 
-def sends(protocol_type):
-    def decorate(fn):
+class _SenderFunction(Protocol):
+    def __call__(
+        self, values: protocol.Values, collection_target: CollectionTarget
+    ) -> protocol.Values:
+        ...
+
+
+senders: List[Tuple[protocol.Type, _SenderFunction]] = []
+
+
+def sends(protocol_type: protocol.Type):
+    def decorate(fn: _SenderFunction):
         senders.append((protocol_type, fn))
         return fn
 
     return decorate
 
 
+_SenderKey = Tuple[str, str, str, int]
+
+
 class Sender:
-    senders = {}
+    senders: Dict[_SenderKey, Sender] = {}
     create_mutex = threading.Lock()
 
     def __init__(
@@ -52,7 +74,12 @@ class Sender:
 
     @classmethod
     def get_sender(
-        cls, hostname, stats_name, collectd_host, collectd_port, log
+        cls,
+        hostname: str,
+        stats_name: str,
+        collectd_host: str,
+        collectd_port: int,
+        log: Logger,
     ):
         cls.create_mutex.acquire()
         try:

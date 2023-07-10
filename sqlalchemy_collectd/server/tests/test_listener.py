@@ -19,7 +19,6 @@ class ListenerTest(testing.TestBase):
         ]
 
         def receive():
-
             obj = collection.pop(0)
             if isinstance(obj, BaseException):
                 raise obj
@@ -29,7 +28,8 @@ class ListenerTest(testing.TestBase):
         with mock.patch.object(listener, "log") as mock_logger:
             listener.listen(mock.Mock(receive=receive))
 
-        listener.listen_thread.join(5)
+            # join the thread while the mock_logger is still attached
+            listener.listen_thread.join(5)
 
         # call "five" doesn't happen because we should have exited
         self.assertEqual(

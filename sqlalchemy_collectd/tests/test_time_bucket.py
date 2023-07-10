@@ -12,7 +12,7 @@ class TimeBucketTest(testing.TestBase):
             yield current
             current += random.randint(0, interval // 2)
 
-    def test_put(self):
+    def test_put(self) -> None:
         agg: stream.TimeBucket[str, str] = stream.TimeBucket()
         interval = 10
         agg.put(50530, interval, "key", "value_50530")

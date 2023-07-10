@@ -1,9 +1,12 @@
-from __future__ import absolute_import
+from __future__ import annotations
 
 import logging
 import os
 import socket
 import sys
+from typing import Any
+from typing import Dict
+from typing import TYPE_CHECKING
 
 from sqlalchemy.engine import CreateEnginePlugin
 
@@ -11,11 +14,19 @@ from . import collector
 from . import sender
 from . import worker
 
+if TYPE_CHECKING:
+    from sqlalchemy import Engine
+    from sqlalchemy import URL
+
+
 log = logging.getLogger("sqlalchemy_collectd")
 
 
 class Plugin(CreateEnginePlugin):
-    def __init__(self, url, kwargs):
+    url: URL
+    config: Dict[str, Any]
+
+    def __init__(self, url: URL, kwargs: dict[str, Any]):
         self.url = url
         self.config = {}
         self._get_argument(
@@ -48,7 +59,7 @@ class Plugin(CreateEnginePlugin):
             if coerce_:
                 dest[dest_name] = coerce_(dest[dest_name])
 
-    def update_url(self, url):
+    def update_url(self, url: URL) -> URL:
         return url.difference_update_query(
             [
                 "collectd_host",
@@ -67,7 +78,7 @@ class Plugin(CreateEnginePlugin):
     def handle_pool_kwargs(self, pool_cls, pool_args):
         """parse and modify pool kwargs"""
 
-    def engine_created(self, engine):
+    def engine_created(self, engine: Engine) -> None:
         """Receive the :class:`.Engine` object when it is fully constructed.
 
         The plugin may make additional changes to the engine, such as
@@ -78,13 +89,12 @@ class Plugin(CreateEnginePlugin):
 
 
 def start_plugin(
-    engine,
-    hostname=None,
-    progname=None,
-    collectd_host="localhost",
-    collectd_port=25827,
-):
-
+    engine: Engine,
+    hostname: str | None = None,
+    progname: str | None = None,
+    collectd_host: str = "localhost",
+    collectd_port: int = 25827,
+) -> None:
     if hostname is None:
         hostname = socket.gethostname()
 

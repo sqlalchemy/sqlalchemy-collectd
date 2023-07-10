@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import threading
 import typing
@@ -23,7 +25,10 @@ def _receive(receiver: "Receiver"):
             break
 
 
-def listen(receiver: "Receiver"):
+listen_thread: threading.Thread
+
+
+def listen(receiver: Receiver) -> None:
     global listen_thread
     listen_thread = threading.Thread(target=_receive, args=(receiver,))
     listen_thread.daemon = True

@@ -1,18 +1,18 @@
-from __future__ import absolute_import
+from __future__ import annotations
 
 import logging
-
-import collectd
 
 from .. import collectd_types
 from .. import protocol
 from ..server.logging import CollectdHandler
 
+if True:
+    import collectd  # type: ignore[import]
+
 log = logging.getLogger(__name__)
 
 
 def get_config(config):
-
     start_plugin(config)
 
 

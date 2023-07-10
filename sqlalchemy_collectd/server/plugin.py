@@ -1,13 +1,14 @@
-from __future__ import absolute_import
+from __future__ import annotations
 
 import logging
 import time
 
-import collectd
-
 from . import listener
 from . import receiver
 from .logging import CollectdHandler
+
+if True:
+    import collectd  # type: ignore[import]
 
 log = logging.getLogger(__name__)
 

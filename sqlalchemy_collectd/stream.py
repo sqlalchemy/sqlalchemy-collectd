@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Dict
 from typing import Generic
 from typing import Iterator
@@ -92,7 +94,6 @@ class TimeBucket(Generic[_TBKEY, _TBVALUE]):
             self.last_interval
             and int(timestamp) < int(self.last_timestamp) - oldest_to_accept
         ):
-
             raise ValueError(
                 f"bucket timestamp is now {self.last_timestamp}, "
                 f"greater than given timestamp of {timestamp} "
@@ -174,4 +175,4 @@ class DictFacade(Generic[_TBKEY, _TBVALUE]):
         return iter(self.dictionary)
 
     def keys(self) -> Iterator[_TBKEY]:
-        return self.dictionary.keys()
+        return iter(self.dictionary.keys())

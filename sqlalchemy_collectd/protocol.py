@@ -2,14 +2,22 @@
 connect straight to the network plugin.
 
 """
+from __future__ import annotations
+
 import os
 import socket
 import struct
 import threading
+from typing import Any
 from typing import Optional
 from typing import Sequence
 from typing import Tuple
+from typing import TYPE_CHECKING
 from typing import Union
+
+if TYPE_CHECKING:
+    from logging import Logger
+
 
 DEFAULT_INTERVAL = 10
 MAX_PACKET_SIZE = 1024
@@ -142,7 +150,7 @@ class Values:
     interval: int
     values: Sequence[Union[float, int]]
 
-    def __init__(self, **kw):
+    def __init__(self, **kw: Any):
         # TODO: see what new python 3 values objects or what can help
         # with this
         for k in self.__slots__:
@@ -157,7 +165,7 @@ class Values:
             if not omit_none or getattr(self, k) is not None
         }
 
-    def build(self, **kw):
+    def build(self, **kw: Any) -> Values:
         d = self._asdict()
         d.update(kw)
         return Values(**d)
@@ -237,7 +245,6 @@ class Values:
 class NetworkSender:
     def __init__(self, connection: "ClientConnection", types: Sequence[Type]):
         self._types = {type_.name: type_ for type_ in types}
-        self._senders = {}  # TODO: not used?
         self.connection = connection
         self.log = connection.log
 
@@ -398,14 +405,16 @@ class ServerConnection:
 
 
 class ClientConnection:
-    connections = {}
+    connections: dict[tuple[str, int], ClientConnection] = {}
+
     create_mutex = threading.Lock()
 
-    socket: Optional["socket.socket"]
+    socket: socket.socket | None
     host: str
     port: int
+    log: Logger
 
-    def __init__(self, host, port, log):
+    def __init__(self, host: str, port: int, log: Logger):
         self.host = host
         self.port = port
         self.log = log
@@ -413,14 +422,16 @@ class ClientConnection:
         self.socket = None
         self.pid = None
 
-    def _check_connect(self) -> "socket.socket":
+    def _check_connect(self):
         if self.socket is None or self.pid != os.getpid():
             self.pid = os.getpid()
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         return self.socket
 
     @classmethod
-    def for_host_port(cls, host, port, log) -> "ClientConnection":
+    def for_host_port(
+        cls, host: str, port: int, log: Logger
+    ) -> ClientConnection:
         cls.create_mutex.acquire()
         try:
             key = (host, port)

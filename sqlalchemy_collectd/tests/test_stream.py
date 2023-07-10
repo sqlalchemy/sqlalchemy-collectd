@@ -117,7 +117,6 @@ class BreakIntoValuesTest(testing.TestBase):
         ]
 
     def test_break_into_values(self):
-
         type_ = protocol.Type(
             "my_type",
             ("some_val", protocol.VALUE_GAUGE),
@@ -133,7 +132,6 @@ class BreakIntoValuesTest(testing.TestBase):
         self.assertEqual(l, self._external_stream())
 
     def test_break_into_values_one_element(self):
-
         type_ = protocol.Type(
             "my_type_one_element", ("some_val", protocol.VALUE_GAUGE)
         )
