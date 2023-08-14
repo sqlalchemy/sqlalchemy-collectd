@@ -33,6 +33,52 @@ reporting applications like `Graphite <https://graphiteapp.org/>`_ and `Grafana
 Architecture Nutshell
 =====================
 
++---------------------------------------------------------+
+|                                                         |
+|                      host A                             |
+|  +------------------------------+                       |
+|  |                              |                       |
+|  |     Python Process A         |                       |
+|  |                              |     +--------------+  |
+|  | +----------+ +-------------+ |     |              |  |
+|  | |SQLAlchemy+-+ SQLAlchemy- +-+-----+              +--+-(optional ---+
+|  | +------+---+ |  collectd   | |     |              |  |  direct host |
+|  |        |     +-------------+ |     | local        |  |  monitor)    |
+|  |        |                     |     | collectd     |  |              |
+|  +--------+---------------------+     | daemon       |  |              |
+|           |                           |              |  |     +--------+----+
+|           |        +-----------+      | +----------+ |  |     |             |
+|           |        | Python    +------+ | SQLA-    | |  |     | connmon     |
+|           | +------+ Process B |      | | collectd | |  |     | console TUI |
+|           | |      +-----------+      | | plugin   | |  |     | (runs on    |
+|           | |                         | +----------+ |  |     |  any host)  |
+|           | |      +-----------+      |              |  |     | -- -------- |
+|           | |      | Python    +------+              |  |     | -- -------- |
+|           | | +----+ Process C |      |              |  |     | -- -------- |
+|           | | |    +-----------+      +----+---------+  |     | -- -------- |
+|           | | |                            |            |     | - --  - --  |
+|           | | |                            |            |     +----+--------+
++-----------+-+-+----------------------------+------------+          |
+            | | |                            |                       |
+            | | |                            |                       |
+  +---------+-+-+-------+          +--------------------+        (optional
+  | host B  | | |       |          | host C  |          |         cluster-wide
+  |     +---+-+-+-+     |          |  +------+--------+ |         monitor)
+  |    |           |    |          |  | collectd      | |            |
+  |    | Database  |    |          |  | aggregator    +-+------------+
+  |    |           |    |          |  | (optional)    | |
+  |     +---------+     |          |  +--+----+----+--+ |
+  |                     |          |     |    |    |    |
+  +---------------------+          +-----+----+----+----+
+                                         |    |    |
+                                  +------+    |    +-------+
+                                  |           |            |
+                              +---+----+  +---+----+ +-----+----+
+                              | host D |  | host E | | host ... |
+                              +--------+  +--------+ +----------+
+
+
+
 sqlalchemy-collectd gathers its statistics from **within** the Python
 application itself, and delivers live metrics to a collectd service over UDP.
 To achieve this, it's client portion is loaded within the process as a

@@ -5,6 +5,7 @@ import threading
 import time
 
 from sqlalchemy import create_engine
+from sqlalchemy import select
 
 logging.basicConfig()
 logging.getLogger("sqlalchemy_collectd").setLevel(logging.DEBUG)
@@ -12,7 +13,7 @@ logging.getLogger("sqlalchemy_collectd").setLevel(logging.DEBUG)
 
 def worker(appname):
     e = create_engine(
-        "sqlite:///file.db?plugin=collectd&collectd_program_name=%s" % appname
+        f"sqlite:///file.db?plugin=collectd&collectd_program_name={appname}"
     )
 
     e.dispose()
@@ -22,7 +23,7 @@ def worker(appname):
             conn = e.connect()
             try:
                 time.sleep(random.random())
-                conn.execute("select 1")
+                conn.execute(select(1))
                 time.sleep(random.random())
             finally:
                 conn.close()
@@ -38,7 +39,7 @@ def worker(appname):
 
 
 procs = [
-    multiprocessing.Process(target=worker, args=(("worker %d" % (i % 20)),))
+    multiprocessing.Process(target=worker, args=((f"worker {i % 20}"),))
     for i in range(50)
 ]
 for proc in procs:
