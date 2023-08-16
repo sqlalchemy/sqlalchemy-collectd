@@ -8,6 +8,7 @@ from typing import Tuple
 from typing import TYPE_CHECKING
 
 from .. import collectd_types
+from .. import networking
 from .. import protocol
 
 if TYPE_CHECKING:
@@ -53,8 +54,8 @@ class Sender:
         self.hostname = hostname
         self.stats_name = stats_name
         self.plugin = plugin
-        self.message_sender = protocol.NetworkSender(
-            protocol.ClientConnection.for_host_port(
+        self.message_sender = networking.NetworkSender(
+            networking.SyncOnlyUDPClientSender.for_host_port(
                 collectd_host, collectd_port, log
             ),
             [protocol_type for protocol_type, sender in senders],

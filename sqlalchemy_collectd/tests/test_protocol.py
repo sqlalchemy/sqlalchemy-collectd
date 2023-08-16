@@ -117,12 +117,13 @@ class CollectDProtocolTest(testing.TestBase):
             type_instance="sometypeinstance",
         )
 
-        connection = mock.Mock()
+        sender = protocol.MessagePacker([type_], mock.Mock())
 
-        sender = protocol.NetworkSender(connection, [type_])
-        sender.send(value.build(time=1517607042.95968, values=[25.809, 450]))
+        byteval = sender.pack_values(
+            value.build(time=1517607042.95968, values=[25.809, 450])
+        )
 
-        self.assertEqual([mock.call(self.message)], connection.send.mock_calls)
+        self.assertEqual(self.message, byteval)
 
     def test_decode_packet(self):
         type_ = protocol.Type(
@@ -131,11 +132,8 @@ class CollectDProtocolTest(testing.TestBase):
             ("some_other_val", protocol.VALUE_DERIVE),
         )
 
-        connection = mock.Mock(
-            receive=mock.Mock(return_value=(self.message, "localhost"))
-        )
-        network_receiver = protocol.NetworkReceiver(connection, [type_])
-        result = network_receiver.receive()
+        network_receiver = protocol.MessageUnpacker([type_], mock.Mock())
+        result = network_receiver.unpack_bytes(self.message)
         self.assertEqual(
             protocol.Values(
                 type="my_type",
@@ -158,15 +156,9 @@ class CollectDProtocolTest(testing.TestBase):
         )
 
         log = mock.Mock()
-        connection = mock.Mock(
-            receive=mock.Mock(
-                return_value=(b"asdfjq34kt2n34kjnas", "localhost")
-            ),
-            log=log,
-        )
-        network_receiver = protocol.NetworkReceiver(connection, [type_])
+        network_receiver = protocol.MessageUnpacker([type_], log)
 
-        result = network_receiver.receive()
+        result = network_receiver.unpack_bytes(b"asdfjq34kt2n34kjnas")
         self.assertEqual(result, None)
         self.assertEqual(
             log.mock_calls,

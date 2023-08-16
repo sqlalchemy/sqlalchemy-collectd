@@ -4,14 +4,10 @@ connect straight to the network plugin.
 """
 from __future__ import annotations
 
-import os
-import socket
 import struct
-import threading
 from typing import Any
 from typing import Optional
 from typing import Sequence
-from typing import Tuple
 from typing import TYPE_CHECKING
 from typing import Union
 
@@ -242,14 +238,12 @@ class Values:
         )
 
 
-class NetworkSender:
-    def __init__(self, connection: "ClientConnection", types: Sequence[Type]):
+class MessagePacker:
+    def __init__(self, types: Sequence[Type], log: Logger):
         self._types = {type_.name: type_ for type_ in types}
-        self.connection = connection
-        self.log = connection.log
+        self.log = log
 
-    def send(self, values_obj):
-        connection = self.connection
+    def pack_values(self, values_obj) -> bytes:
         timestamp = values_obj.time
         type_name = values_obj.type
 
@@ -276,13 +270,7 @@ class NetworkSender:
 
         payload = type_obj._encode_values(*values_obj.values)
 
-        self.log.debug(
-            "send[UDP:%s:%s] -> %s",
-            connection.host,
-            connection.port,
-            values_obj,
-        )
-        connection.send(header_ + payload)
+        return header_ + payload
 
     def _pack_string(self, typecode: int, value: str) -> bytes:
         value = value or ""
@@ -293,9 +281,8 @@ class NetworkSender:
         )
 
 
-class NetworkReceiver:
-    def __init__(self, connection: "ServerConnection", types: Sequence[Type]):
-        self.connection = connection
+class MessageUnpacker:
+    def __init__(self, types: Sequence[Type], log: Logger):
         self._receivers = {
             TYPE_HOST: self._unpack_string,
             TYPE_TIME: self._unpack_long,
@@ -307,11 +294,9 @@ class NetworkReceiver:
             TYPE_INTERVAL: self._unpack_long,
         }
         self._types = {type_.name: type_ for type_ in types}
-        self.log = connection.log
+        self.log = log
 
-    def receive(self) -> Optional[Values]:
-        connection = self.connection
-        buf, host_ = connection.receive()
+    def unpack_bytes(self, buf: bytes) -> Optional[Values]:
         result = self._unpack_packet(buf)
         try:
             type_name = result[TYPE_TYPE]
@@ -328,14 +313,6 @@ class NetworkReceiver:
         else:
             value = self._to_value(result)
             return value
-        finally:
-            if value is not None:
-                self.log.debug(
-                    "receive[UDP:%s:%s] -> %s",
-                    connection.host,
-                    connection.port,
-                    value,
-                )
 
     def _to_value(self, result) -> Values:
         return Values(
@@ -385,73 +362,3 @@ class NetworkReceiver:
             result.append(struct_.unpack_from(buf, values_pos)[0])
             values_pos += struct_.size
         return result
-
-
-class ServerConnection:
-    host: str
-    port: int
-    socket: "socket.socket"
-
-    def __init__(self, host, port, log):
-        self.host = host
-        self.port = port
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind((host, port))
-        self.log = log
-
-    def receive(self) -> Tuple[bytes, str]:
-        data, addr = self.sock.recvfrom(1024)
-        return data, addr
-
-
-class ClientConnection:
-    connections: dict[tuple[str, int], ClientConnection] = {}
-
-    create_mutex = threading.Lock()
-
-    socket: socket.socket | None
-    host: str
-    port: int
-    log: Logger
-
-    def __init__(self, host: str, port: int, log: Logger):
-        self.host = host
-        self.port = port
-        self.log = log
-        self._mutex = threading.Lock()
-        self.socket = None
-        self.pid = None
-
-    def _check_connect(self):
-        if self.socket is None or self.pid != os.getpid():
-            self.pid = os.getpid()
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        return self.socket
-
-    @classmethod
-    def for_host_port(
-        cls, host: str, port: int, log: Logger
-    ) -> ClientConnection:
-        cls.create_mutex.acquire()
-        try:
-            key = (host, port)
-            if key not in cls.connections:
-                cls.connections[key] = connection = ClientConnection(
-                    host, port, log
-                )
-                return connection
-            else:
-                return cls.connections[key]
-
-        finally:
-            cls.create_mutex.release()
-
-    def send(self, message: bytes):
-        self._mutex.acquire()
-        try:
-            socket = self._check_connect()
-            socket.sendto(message, (self.host, self.port))
-        except IOError:
-            self.log.error("Error in socket.sendto", exc_info=True)
-        finally:
-            self._mutex.release()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import threading
+import asyncio
 import time
 from typing import Callable
 from typing import Protocol
@@ -11,7 +11,7 @@ from typing import TypeVar
 if TYPE_CHECKING:
     from logging import Logger
 
-    from ..protocol import NetworkReceiver
+    from ..networking import AsyncNetworkReceiver
     from ..protocol import Values
 
 
@@ -190,8 +190,8 @@ def update_total_checkouts(
 
 
 class Stat:
-    worker: threading.Thread
-    process: threading.Thread
+    worker: asyncio.Task
+    process: asyncio.Task
     host_count: int
     max_host_count: int
     process_count: int
@@ -203,7 +203,7 @@ class Stat:
     hostprogs: dict[tuple[str, str | None], HostProg]
     hosts: dict[str, HostProg]
 
-    def __init__(self, receiver: NetworkReceiver, log: Logger):
+    def __init__(self, receiver: AsyncNetworkReceiver, log: Logger):
         self.receiver = receiver
         self.log = log
         self.host_count = 0
@@ -219,13 +219,9 @@ class Stat:
         self.hosts = {}
 
     def start(self) -> None:
-        self.worker = threading.Thread(target=self._wrap_update)
-        self.worker.daemon = True
+        self.worker = asyncio.create_task(self._wrap_update())
 
-        self.process = threading.Thread(target=self._process_hostprogs)
-        self.process.daemon = True
-        self.worker.start()
-        self.process.start()
+        self.process = asyncio.create_task(self._process_hostprogs())
 
     def _get_hostprog(self, hostname: str, progname: str | None) -> HostProg:
         if progname is None or progname == "host":
@@ -242,10 +238,9 @@ class Stat:
                 hostprog = self.hostprogs[(hostname, progname)]
         return hostprog
 
-    def _process_hostprogs(self) -> None:
+    async def _process_hostprogs(self) -> None:
         while True:
-            time.sleep(0.5)
-
+            await asyncio.sleep(0.5)
             self.update_host_stats()
 
             now = time.time()
@@ -261,10 +256,10 @@ class Stat:
                 elif age > hostprog.interval * 2:
                     hostprog.kill_processes()
 
-    def _wrap_update(self) -> None:
+    async def _wrap_update(self) -> None:
         while True:
             try:
-                self._update()
+                await self._update()
             except Exception:
                 self.log.error(
                     "message receiver caught an exception", exc_info=True
@@ -276,8 +271,8 @@ class Stat:
                 )
                 break
 
-    def _update(self) -> None:
-        values_obj = self.receiver.receive()
+    async def _update(self) -> None:
+        values_obj = await self.receiver.receive_async()
         if values_obj is None:
             return
 

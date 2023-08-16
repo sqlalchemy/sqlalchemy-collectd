@@ -1,5 +1,6 @@
 from __future__ import division
 
+import asyncio
 import curses
 import functools
 import operator
@@ -304,7 +305,7 @@ class Display(object):
             if screen:
                 self._render(time.time())
 
-    def start(self):
+    def _start_impl(self):
         self.enabled = True
         window = curses.initscr()
 
@@ -323,20 +324,20 @@ class Display(object):
         self.window = window
         self._refresh_winsize(ProgStatsLayout())
 
+    async def run_async(self):
+        self._start_impl()
+
         try:
             with util.stop_on_keyinterrupt():
-                self._redraw()
+                render_timer = util.periodic_timer(0.5)
+                while self.enabled:
+                    await asyncio.sleep(0.1)
+                    now = time.time()
+                    if render_timer(now):
+                        self._render(now)
+                    self._handle_cmds()
         finally:
             self.stop()
-
-    def _redraw(self):
-        render_timer = util.periodic_timer(0.5)
-        while self.enabled:
-            time.sleep(0.1)
-            now = time.time()
-            if render_timer(now):
-                self._render(now)
-            self._handle_cmds()
 
     def _handle_cmds(self):
         char = self.window.getch()
